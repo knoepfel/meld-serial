@@ -10,6 +10,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 
+find_package(fmt REQUIRED)
+find_package(spdlog REQUIRED)
 find_package(TBB REQUIRED)
 
 add_subdirectory(serial)

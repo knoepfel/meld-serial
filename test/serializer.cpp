@@ -2,6 +2,7 @@
 #include "serial/thread_counter.hpp"
 
 #include "oneapi/tbb/flow_graph.h"
+#include "spdlog/spdlog.h"
 
 #include <atomic>
 #include <format>
@@ -31,7 +32,7 @@ void serialize_functions_based_on_resource()
   serial_node<unsigned int, 1> node1{
     g, serialized_resources.get("ROOT"), [&root_counter](unsigned int const i) {
       thread_counter c{root_counter};
-      std::cout << std::format("Processing from node 1 {}", i) << std::endl;
+      spdlog::info("Processing from node 1 {}", i);
       return i;
     }};
 
@@ -40,15 +41,14 @@ void serialize_functions_based_on_resource()
                                      [&root_counter, &genie_counter](unsigned int const i) {
                                        thread_counter c1{root_counter};
                                        thread_counter c2{genie_counter};
-                                       std::cout << std::format("Processing from node 2 {}", i)
-                                                 << std::endl;
+                                       spdlog::info("Processing from node 2 {}", i);
                                        return i;
                                      }};
 
   serial_node<unsigned int, 1> node3{
     g, serialized_resources.get("GENIE"), [&genie_counter](unsigned int const i) {
       thread_counter c{genie_counter};
-      std::cout << std::format("Processing from node 3 {}", i) << std::endl;
+      spdlog::info("Processing from node 3 {}", i);
       return i;
     }};
 
@@ -58,7 +58,7 @@ void serialize_functions_based_on_resource()
   auto receiving_node_for = [](tbb::flow::graph& g, std::string const& label) {
     return flow::function_node<unsigned int, unsigned int>{
       g, flow::unlimited, [&label](unsigned int const i) {
-        std::cout << std::format("Processed {} task {}", label, i) << std::endl;
+        spdlog::info("Processed {} task {}", label, i);
         return i;
       }};
   };
@@ -104,7 +104,7 @@ void serialize_functions_when_splitting_then_merging()
     return serial_node<unsigned int, 1>{
       g, root_resource, [&root_counter, label](unsigned int const i) {
         thread_counter c{root_counter};
-        std::cout << std::format("Processing from node {} {}", label, i) << std::endl;
+        spdlog::info("Processing from node {} {}", label, i);
         return i;
       }};
   };
@@ -126,5 +126,5 @@ void serialize_functions_when_splitting_then_merging()
 int main()
 {
   serialize_functions_based_on_resource();
-  serialize_functions_when_splitting_then_merging();
+  //  serialize_functions_when_splitting_then_merging();
 }

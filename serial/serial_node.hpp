@@ -8,20 +8,40 @@
 
 namespace meld {
 
-  template <typename Input>
-  using base = tbb::flow::composite_node<std::tuple<Input>, std::tuple<Input>>;
+  template <typename T>
+  struct maybe_wrap_as_tuple {
+    using type = std::tuple<T>;
+  };
 
-  namespace detail {
-    template <typename Input, std::size_t N>
-    using join_tuple = concatenated_tuples<std::tuple<Input>, sized_tuple<token_t, N>>;
-  }
+  template <typename... Ts>
+  struct maybe_wrap_as_tuple<std::tuple<Ts...>> {
+    using type = std::tuple<Ts...>;
+  };
 
-  template <typename Input, std::size_t N>
-  class serial_node : public base<Input> {
+  template <typename T>
+  using maybe_wrap_as_tuple_t = typename maybe_wrap_as_tuple<T>::type;
+
+  template <typename InputTuple, typename OutputTuple>
+  using base = tbb::flow::composite_node<InputTuple, OutputTuple>;
+
+  template <typename Input, std::size_t N, typename Output = Input>
+  class serial_node : public base<maybe_wrap_as_tuple_t<Input>, maybe_wrap_as_tuple_t<Output>> {
+    using input_tuple = maybe_wrap_as_tuple_t<Input>;
+    using output_tuple = maybe_wrap_as_tuple_t<Output>;
+    using base_t = base<input_tuple, output_tuple>;
+    using join_tuple = concatenated_tuples<input_tuple, sized_tuple<token_t, N>>;
+
     template <typename Serializers, std::size_t... I>
-    void make_edges(std::index_sequence<I...>, Serializers const& serializers)
+    void make_serializer_edges(std::index_sequence<I...>, Serializers const& serializers)
     {
       (make_edge(std::get<I>(serializers), input_port<I + 1>(join_)), ...);
+    }
+
+    template <typename Serializers, std::size_t... I>
+    void return_tokens(Serializers serialized_resources [[maybe_unused]], std::index_sequence<I...>)
+    {
+      // FIXME: Might want to return the received tokens instead of just '1'.
+      (std::get<I>(serialized_resources).try_put(1), ...);
     }
 
     template <typename FT, typename Serializers, std::size_t... I>
@@ -30,27 +50,26 @@ namespace meld {
                          FT f,
                          Serializers serializers,
                          std::index_sequence<I...> iseq) :
-      base<Input>{g},
+      base_t{g},
       buffered_msgs_{g},
       join_{g},
-      serialized_function_{g,
-                           concurrency,
-                           [serialized_resources = std::move(serializers), function = std::move(f)](
-                             detail::join_tuple<Input, N> const& tup) mutable {
-                             (void)serialized_resources; // To silence unused warning when N == 0
-                             auto input = std::get<0>(tup);
-                             function(input);
-                             (std::get<I>(serialized_resources).try_put(1), ...);
-                             return input;
-                           }}
+      serialized_function_{
+        g,
+        concurrency,
+        [serialized_resources = std::move(serializers), function = std::move(f), iseq, this](
+          join_tuple const& tup) mutable {
+          auto input = std::get<0>(tup);
+          auto output = function(input);
+          return_tokens(serialized_resources, iseq);
+          return output;
+        }}
     {
       // Need way to route null messages around the join.
       make_edge(buffered_msgs_, input_port<0>(join_));
-      make_edges(iseq, serializers);
+      make_serializer_edges(iseq, serializers);
       make_edge(join_, serialized_function_);
-      base<Input>::set_external_ports(
-        typename base<Input>::input_ports_type{buffered_msgs_},
-        typename base<Input>::output_ports_type{serialized_function_});
+      base_t::set_external_ports(typename base_t::input_ports_type{buffered_msgs_},
+                                 typename base_t::output_ports_type{serialized_function_});
     }
 
   public:
@@ -74,8 +93,8 @@ namespace meld {
 
   private:
     tbb::flow::buffer_node<Input> buffered_msgs_;
-    tbb::flow::join_node<detail::join_tuple<Input, N>, tbb::flow::reserving> join_;
-    tbb::flow::function_node<detail::join_tuple<Input, N>, Input> serialized_function_;
+    tbb::flow::join_node<join_tuple, tbb::flow::reserving> join_;
+    tbb::flow::function_node<join_tuple, Output> serialized_function_;
   };
 }
 

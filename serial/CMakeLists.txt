@@ -1,5 +1,6 @@
 add_library(meld_serial SHARED
   serializer_node.cpp
+  timed_busy.cpp 
 )
 target_include_directories(meld_serial PRIVATE ${PROJECT_SOURCE_DIR})
 target_link_libraries(meld_serial PRIVATE TBB::tbb)

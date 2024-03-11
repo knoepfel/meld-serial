@@ -13,6 +13,7 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(TBB REQUIRED)
+find_package(Catch2 REQUIRED)
 
 add_subdirectory(serial)
 

@@ -5,6 +5,7 @@
 #include "spdlog/spdlog.h"
 
 #include <atomic>
+#include <chrono>
 #include <format>
 #include <iostream>
 #include <string>
@@ -21,6 +22,25 @@ namespace {
         return i;
       }};
   }
+
+  template <typename Input, typename Output>
+  class algorithm {
+  public:
+    algorithm(std::chrono::seconds s) : seconds_{s} {}
+    Output operator()(Input) const
+    {
+      auto const begin = std::chrono::steady_clock::now();
+      auto t = begin;
+      while (t - begin < seconds_) {
+        t = std::chrono::steady_clock::now();
+      }
+      spdlog::info("Executed in {} seconds", t - begin);
+      return {};
+    }
+
+  private:
+    std::chrono::seconds seconds_;
+  };
 }
 
 void serialize_functions_based_on_resource()
@@ -37,6 +57,7 @@ void serialize_functions_based_on_resource()
                        }};
 
   serializers serialized_resources{g};
+
 
   serial_node<unsigned int, 1> node1{g, serialized_resources.get("ROOT"), [](unsigned int const i) {
                                        spdlog::info("Processing from node 1 {}", i);

@@ -9,6 +9,7 @@ add_compile_options(-Wall -Werror -Wunused -Wunused-parameter -pedantic)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library")
 
 include(FetchContent)
 

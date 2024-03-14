@@ -5,7 +5,6 @@
 #include "spdlog/spdlog.h"
 
 #include <atomic>
-#include <format>
 #include <iostream>
 #include <string>
 

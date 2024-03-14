@@ -3,6 +3,7 @@
 
 #include "oneapi/tbb/flow_graph.h"
 #include "spdlog/spdlog.h"
+#include "fmt/chrono.h"
 
 #include <atomic>
 #include <chrono>

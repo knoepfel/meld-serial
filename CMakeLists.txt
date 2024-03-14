@@ -10,10 +10,33 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 
-find_package(fmt REQUIRED)
-find_package(spdlog REQUIRED)
+include(FetchContent)
+
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG        10.2.1
+  GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(fmt)
+
+FetchContent_Declare(
+  spdlog
+  GIT_REPOSITORY https://github.com/gabime/spdlog.git
+  GIT_TAG        v1.13.0
+  GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(spdlog)
+
+FetchContent_Declare(
+  Catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG        v3.5.2
+  GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(Catch2)
+
 find_package(TBB REQUIRED)
-find_package(Catch2 REQUIRED)
 
 add_subdirectory(serial)
 

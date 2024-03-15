@@ -9,6 +9,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_compile_options(-Wall -Werror -Wunused -Wunused-parameter -pedantic)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+add_compile_options(
+  -fno-omit-frame-pointer
+  -fsanitize=address
+  -fsanitize=undefined
+)
+
+add_link_options(
+  -fno-omit-frame-pointer
+  -fsanitize=address
+  -fsanitize=undefined
+)
+
+
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library")
 

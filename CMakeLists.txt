@@ -8,17 +8,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_compile_options(
-  -fno-omit-frame-pointer
-  -fsanitize=address
-  -fsanitize=undefined
-)
+# add_compile_options(
+#   -fno-omit-frame-pointer
+#   -fsanitize=address
+#   -fsanitize=undefined
+# )
 
-add_link_options(
-  -fno-omit-frame-pointer
-  -fsanitize=address
-  -fsanitize=undefined
-)
+# add_link_options(
+#   -fno-omit-frame-pointer
+#   -fsanitize=address
+#   -fsanitize=undefined
+# )
 
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)

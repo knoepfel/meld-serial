@@ -6,7 +6,6 @@ project(meld-serial VERSION 0.0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
-add_compile_options(-Wall -Werror -Wunused -Wunused-parameter -pedantic)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_compile_options(
@@ -53,6 +52,7 @@ FetchContent_MakeAvailable(Catch2)
 
 find_package(TBB REQUIRED)
 
+add_compile_options(-Wall -Werror -Wunused -Wunused-parameter -pedantic)
 add_subdirectory(serial)
 
 include(CTest)

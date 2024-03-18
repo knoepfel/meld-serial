@@ -17,7 +17,7 @@ namespace {
   auto output_node(tbb::flow::graph& g, std::string const& label)
   {
     return flow::function_node<unsigned int, unsigned int>{
-      g, flow::unlimited, [&label](unsigned int const i) {
+      g, flow::unlimited, [label](unsigned int const i) {
         spdlog::info("Output node {} task {}", label, i);
         return i;
       }};

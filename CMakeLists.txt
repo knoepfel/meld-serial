@@ -6,8 +6,20 @@ project(meld-serial VERSION 0.0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
-add_compile_options(-Wall -Werror -Wunused -Wunused-parameter -pedantic)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# add_compile_options(
+#   -fno-omit-frame-pointer
+#   -fsanitize=address
+#   -fsanitize=undefined
+# )
+
+# add_link_options(
+#   -fno-omit-frame-pointer
+#   -fsanitize=address
+#   -fsanitize=undefined
+# )
+
 
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
 set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library")
@@ -40,6 +52,7 @@ FetchContent_MakeAvailable(Catch2)
 
 find_package(TBB REQUIRED)
 
+add_compile_options(-Wall -Werror -Wunused -Wunused-parameter -pedantic)
 add_subdirectory(serial)
 
 include(CTest)

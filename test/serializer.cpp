@@ -56,7 +56,7 @@ void serialize_functions_based_on_resource()
 
   auto receiving_node_for = [](tbb::flow::graph& g, std::string const& label) {
     return flow::function_node<unsigned int, unsigned int>{
-      g, flow::unlimited, [&label](unsigned int const i) {
+      g, flow::unlimited, [label](unsigned int const i) {
         spdlog::info("Processed {} task {}", label, i);
         return i;
       }};

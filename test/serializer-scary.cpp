@@ -1,9 +1,9 @@
 #include "serial/serial_node.hpp"
 #include "serial/thread_counter.hpp"
 
+#include "fmt/chrono.h"
 #include "oneapi/tbb/flow_graph.h"
 #include "spdlog/spdlog.h"
-#include "fmt/chrono.h"
 
 #include <atomic>
 #include <chrono>
@@ -57,7 +57,6 @@ void serialize_functions_based_on_resource()
                        }};
 
   serializers serialized_resources{g};
-
 
   serial_node<unsigned int, 1> node1{g, serialized_resources.get("ROOT"), [](unsigned int const i) {
                                        spdlog::info("Processing from node 1 {}", i);

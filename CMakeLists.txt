@@ -54,6 +54,7 @@ find_package(TBB REQUIRED)
 
 add_compile_options(-Wall -Werror -Wunused -Wunused-parameter -pedantic)
 add_subdirectory(serial)
+add_subdirectory(reduction)
 
 include(CTest)
 add_subdirectory(test)

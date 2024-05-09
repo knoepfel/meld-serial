@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <format>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <tuple>
@@ -26,20 +27,20 @@ namespace meld {
   };
 
   template <typename T>
-  struct maybe_value_type {
+  concept is_atomic = std::same_as<T, std::atomic<typename T::value_type>>;
+
+  template <typename T>
+  struct value_type {
     using type = T;
   };
 
-  template <typename T>
-  concept has_value_type = requires(T) { typename T::value_type; };
-
-  template <has_value_type T>
-  struct maybe_value_type<T> {
+  template <is_atomic T>
+  struct value_type<T> {
     using type = typename T::value_type;
   };
 
   template <typename T>
-  using maybe_value_type_t = typename maybe_value_type<T>::type;
+  using value_type_t = typename value_type<T>::type;
 
   using count_t = std::atomic<long long>;
 
@@ -60,19 +61,35 @@ namespace meld {
 
   template <typename Input, typename Result>
   class reduction_node :
-    public flow::multifunction_node<reduction_msg<Input>, std::tuple<maybe_value_type_t<Result>>> {
-    using output_t = maybe_value_type_t<Result>;
+    public flow::multifunction_node<reduction_msg<Input>, std::tuple<value_type_t<Result>>> {
+    using output_t = value_type_t<Result>;
     struct data_with_count {
-      data_with_count(output_t initializer) : result{std::move(initializer)} {}
-      Result result;
+      data_with_count() = default;
+      data_with_count(output_t initializer) :
+        result{std::make_unique<Result>(std::move(initializer))}
+      {
+      }
+      std::unique_ptr<Result> result{};
       count_t count{};
       long long total{};
     };
     using data_with_count_ptr = std::shared_ptr<data_with_count>;
 
+    using initializer_t = std::function<output_t(std::size_t)>;
     using results_t = tbb::concurrent_hash_map<std::size_t, data_with_count_ptr>;
     using accessor = results_t::accessor;
     using const_accessor = results_t::const_accessor;
+
+    template <typename T>
+    static initializer_t initializer_fcn(T initializer)
+    {
+      if constexpr (std::regular_invocable<T, std::size_t>) {
+        return initializer;
+      }
+      else {
+        return [initializer](std::size_t) -> output_t { return initializer; };
+      }
+    }
 
   public:
     using base_t = flow::multifunction_node<reduction_msg<Input>, std::tuple<output_t>>;
@@ -87,17 +104,14 @@ namespace meld {
                std::size_t sequence_id = -1ull;
                if (auto const* it = std::get_if<reduction_tag<Input>>(&msg)) {
                  sequence_id = it->sequence_id;
-                 std::tie(count, std::ignore, result) = result_entry(sequence_id);
+                 std::tie(count, result) = result_entry(sequence_id);
                  op(*result, it->data);
                  ++(*count);
                }
                else {
                  auto& end = std::get<reduction_end>(msg);
                  sequence_id = end.sequence_id;
-                 long long* n = nullptr;
-                 std::tie(count, n, result) = result_entry(sequence_id);
-                 *n = end.count;
-                 *count -= end.count;
+                 std::tie(count, result) = result_entry(sequence_id, end.count);
                }
                if (*count == 0) {
                  auto output_result = output(std::as_const(*result));
@@ -105,21 +119,36 @@ namespace meld {
                  results_.erase(sequence_id);
                }
              }},
-      initializer_(initializer)
+      initializer_(initializer_fcn(std::move(initializer)))
     {
     }
 
   private:
-    std::tuple<count_t*, long long*, Result*> result_entry(std::size_t sequence_id)
+    std::pair<count_t*, Result*> result_entry(std::size_t sequence_id)
     {
       accessor a;
       if (results_.insert(a, sequence_id)) {
-        a->second = std::make_shared<data_with_count>(initializer_);
+        a->second = std::make_shared<data_with_count>(initializer_(sequence_id));
       }
-      return {&a->second->count, &a->second->total, &a->second->result};
+      else if (a->second->result == nullptr) {
+        // This can happen if the end message is received before any other messages.
+        a->second->result = std::make_unique<Result>(initializer_(sequence_id));
+      }
+      return {&a->second->count, a->second->result.get()};
     }
 
-    output_t initializer_;
+    std::pair<count_t*, Result*> result_entry(std::size_t sequence_id, long long end_count)
+    {
+      accessor a;
+      if (results_.insert(a, sequence_id)) {
+        a->second = std::make_shared<data_with_count>();
+      }
+      a->second->count -= end_count;
+      a->second->total = end_count;
+      return {&a->second->count, a->second->result.get()};
+    }
+
+    initializer_t initializer_;
     results_t results_;
   };
 

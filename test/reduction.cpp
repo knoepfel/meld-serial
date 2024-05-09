@@ -9,6 +9,16 @@
 using namespace oneapi::tbb;
 using namespace meld;
 
+namespace {
+  template <typename T>
+  auto printer_for = [](tbb::flow::graph& g, std::string label) {
+    return flow::function_node<T>{g, flow::unlimited, [name = std::move(label)](T const& t) {
+                                    spdlog::info("{}: {}", name, t);
+                                    return flow::continue_msg{};
+                                  }};
+  };
+}
+
 int main()
 {
   flow::graph g;
@@ -32,21 +42,24 @@ int main()
   reduction_node<unsigned int, unsigned int> multiplier{
     g, flow::serial, 1, [](unsigned int& result, unsigned int const i) { result *= i; }};
 
-  auto receiving_node_for = [](tbb::flow::graph& g, std::string label) {
-    return flow::function_node<unsigned int, unsigned int>{
-      g, flow::unlimited, [name = std::move(label)](unsigned int const i) {
-        spdlog::info("{}: {}", name, i);
-        return i;
-      }};
-  };
+  reduction_node<unsigned int, std::string> dasher{
+    g, flow::serial, "", [](std::string& result, unsigned int const i) {
+      if (!result.empty()) {
+        result += "-";
+      }
+      result += std::to_string(i);
+    }};
 
-  auto sum_receiver = receiving_node_for(g, "sum");
-  auto product_receiver = receiving_node_for(g, "product");
+  auto sum_printer = printer_for<unsigned int>(g, "sum");
+  auto product_printer = printer_for<unsigned int>(g, "product");
+  auto dashed_printer = printer_for<std::string>(g, "dash-separated string");
 
   make_edge(src, adder);
   make_edge(src, multiplier);
-  make_edge(adder, sum_receiver);
-  make_edge(multiplier, product_receiver);
+  make_edge(src, dasher);
+  make_edge(adder, sum_printer);
+  make_edge(multiplier, product_printer);
+  make_edge(dasher, dashed_printer);
 
   src.activate();
   g.wait_for_all();

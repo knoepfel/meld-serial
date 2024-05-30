@@ -6,9 +6,9 @@ add_executable(reduction reduction.cpp)
 target_link_libraries(reduction PRIVATE meld::reduction spdlog::spdlog)
 add_test(NAME test_reduction COMMAND reduction)
 
-add_executable(serializer-scary serializer-scary.cpp)
-target_link_libraries(serializer-scary PRIVATE meld::serial spdlog::spdlog)
-add_test(NAME test_serializer_scary COMMAND serializer-scary)
+add_executable(serializer_scary serializer_scary.cpp)
+target_link_libraries(serializer_scary PRIVATE meld::serial spdlog::spdlog)
+add_test(NAME test_serializer_scary COMMAND serializer_scary)
 
 add_executable(test_timed_busy test_timed_busy.cpp)
 target_link_libraries(test_timed_busy PRIVATE meld::serial Catch2::Catch2WithMain)

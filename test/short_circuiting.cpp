@@ -1,5 +1,6 @@
 #include "oneapi/tbb/flow_graph.h"
 #include "short_circuiter/short_circuiter_node.hpp"
+#include "short_circuiter/simple_short_circuiter_node.hpp"
 #include "spdlog/spdlog.h"
 
 #include <functional>
@@ -45,13 +46,17 @@ int main()
                          return {id, nullptr};
                        }};
 
-  auto pointer_printer = printer_for<int>(g, "squared pointer printer");
+  auto printer = printer_for<int>(g, "printer for squarer");
+  auto simple_printer = printer_for<int>(g, "printer for simple_squarer");
 
   auto user_func = [](int const& n) { return n * n; };
   short_circuiter<std::tuple<int>, int> squarer{g, flow::serial, user_func};
+  simple_short_circuiter<std::tuple<int>, int> simple_squarer{g, flow::serial, user_func};
 
   make_edge(src, squarer);
-  make_edge(squarer, pointer_printer);
+  make_edge(src, simple_squarer);
+  make_edge(squarer, printer);
+  make_edge(simple_squarer, simple_printer);
 
   src.activate();
   g.wait_for_all();

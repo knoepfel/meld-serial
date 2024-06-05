@@ -29,13 +29,13 @@ namespace meld {
     short_circuiter(tbb::flow::graph& g, std::size_t concurrency, FT f) :
       base_t{g},
       joiner_{make_join<join_t, input_msgs_t>(g, in_sequence_t{})},
-      router_{g, tbb::flow::unlimited, [this](msg_tuple_t const& msgs) { return route(msgs); }},
+      router_{g, tbb::flow::unlimited, [this](msg_tuple_t const& msgs) noexcept { return route(msgs); }},
       wrapped_user_func_{g,
                          concurrency,
                          [func = std::move(f)](msg_tuple_t const& msgs) {
                            return invoke_on_msgs<Out>(func, msgs, in_sequence_t{});
                          }},
-      output_{g, tbb::flow::unlimited, [](msg<Out> const& m) { return m; }}
+      output_{g, tbb::flow::unlimited, [](msg<Out> const& m) noexcept { return m; }}
     {
       make_edge(joiner_, router_);
       make_edge(wrapped_user_func_, output_);
@@ -46,7 +46,7 @@ namespace meld {
     }
 
   private:
-    tbb::flow::continue_msg route(msg_tuple_t const& msgs)
+    tbb::flow::continue_msg route(msg_tuple_t const& msgs) noexcept
     {
       if (at_least_one_null(msgs)) {
         output_.try_put({std::get<0>(msgs).id, nullptr});
@@ -58,7 +58,7 @@ namespace meld {
     }
 
     join_t joiner_;
-    tbb::flow::function_node<msg_tuple_t> router_;
+    tbb::flow::function_node<msg_tuple_t, tbb::flow::continue_msg, tbb::flow::lightweight> router_;
     tbb::flow::function_node<msg_tuple_t, msg<Out>> wrapped_user_func_;
     tbb::flow::function_node<msg<Out>, msg<Out>, tbb::flow::lightweight> output_;
   };

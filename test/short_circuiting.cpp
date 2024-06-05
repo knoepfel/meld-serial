@@ -45,7 +45,7 @@ namespace {
                            if (j % 2 == 0) {
                              return make_message(id, j);
                            }
-                           return make_message<int>(id);
+                           return make_null_message<int>(id);
                          }};
 
     auto user_func = [](int const& n) { return n * n; };
@@ -60,16 +60,24 @@ namespace {
   }
 }
 
+TEST_CASE("Warmup")
+{
+  // Purpose of this test is to get any one-time initialization tasks out of the way
+  // before doing the real tests.
+  spdlog::info("");
+  flow::graph g;
+}
+
+TEST_CASE("Optimized short circuiting")
+{
+  spdlog::info("");
+  timer report_for_optimized{"squared numbers"};
+  test_short_circuit<short_circuiter<std::tuple<int>, int>>("squared numbers");
+}
+
 TEST_CASE("Simple short circuiting")
 {
+  spdlog::info("");
   timer report_for_simple{"simply squared numbers"};
   test_short_circuit<simple_short_circuiter<std::tuple<int>, int>>("simply squared numbers");
 }
-
-// TEST_CASE("Optimized short circuiting")
-// {
-//   std::cout << std::endl;
-
-//   timer report_for_optimized{"squared numbers"};
-//   test_short_circuit<short_circuiter<std::tuple<int>, int>>("squared numbers");
-// }

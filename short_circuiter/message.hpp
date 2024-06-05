@@ -23,7 +23,7 @@ namespace meld {
   }
 
   template <typename T>
-  msg<T> make_message(std::size_t i)
+  msg<T> make_null_message(std::size_t i)
   {
     return {.id = i, .data = nullptr};
   }

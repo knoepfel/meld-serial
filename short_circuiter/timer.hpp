@@ -16,9 +16,8 @@ namespace meld {
     ~timer()
     {
       using namespace std::chrono;
-      spdlog::info("{:6.4f} ms elapsed{}",
-                   duration<double, std::milli>(steady_clock::now() - start_).count(),
-                   label_);
+      auto dur = duration<double, std::milli>(steady_clock::now() - start_).count();
+      spdlog::info("{:6.4f} ms elapsed{}", dur, label_);
     }
 
   private:

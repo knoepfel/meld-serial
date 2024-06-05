@@ -1,6 +1,8 @@
+#include "catch2/catch_test_macros.hpp"
 #include "oneapi/tbb/flow_graph.h"
 #include "short_circuiter/short_circuiter_node.hpp"
 #include "short_circuiter/simple_short_circuiter_node.hpp"
+#include "short_circuiter/timer.hpp"
 #include "spdlog/spdlog.h"
 
 #include <functional>
@@ -18,46 +20,54 @@ namespace {
     return flow::function_node<msg<T>>{
       g, flow::unlimited, [name = std::move(label)](msg<T> const& m) {
         if (m.data) {
-          spdlog::info("{}: {}", name, *m.data);
+          spdlog::debug("{}: {}", name, *m.data);
         }
         else {
-          spdlog::info("{}: empty", name);
+          spdlog::debug("{}: empty", name);
         }
         return flow::continue_msg{};
       }};
   }
+
+  template <typename ShortCircuiter>
+  void test_short_circuit(std::string const& printer_label)
+  {
+    flow::graph g;
+    int i{};
+    flow::input_node src{g, [&i](flow_control& fc) -> msg<int> {
+                           if (i == 10) {
+                             fc.stop();
+                             return {};
+                           }
+
+                           auto j = i++;
+                           unsigned int id = j;
+                           if (j % 2 == 0) {
+                             return {id, std::make_shared<int>(j)};
+                           }
+                           return {id, nullptr};
+                         }};
+
+    auto user_func = [](int const& n) { return n * n; };
+    auto printer = printer_for<int>(g, "printer for " + printer_label);
+    ShortCircuiter squarer{g, flow::serial, user_func};
+
+    make_edge(src, squarer);
+    make_edge(squarer, printer);
+
+    src.activate();
+    g.wait_for_all();
+  }
 }
 
-int main()
+TEST_CASE("Simple short circuiting")
 {
-  flow::graph g;
-  int i{};
-  flow::input_node src{g, [&i](flow_control& fc) -> msg<int> {
-                         if (i == 10) {
-                           fc.stop();
-                           return {};
-                         }
+  meld::timer timer_for_simple{"simply squared numbers"};
+  test_short_circuit<simple_short_circuiter<std::tuple<int>, int>>("simply squared numbers");
+}
 
-                         auto j = i++;
-                         unsigned int id = j;
-                         if (j % 2 == 0) {
-                           return {id, std::make_shared<int>(j)};
-                         }
-                         return {id, nullptr};
-                       }};
-
-  auto printer = printer_for<int>(g, "printer for squarer");
-  auto simple_printer = printer_for<int>(g, "printer for simple_squarer");
-
-  auto user_func = [](int const& n) { return n * n; };
-  short_circuiter<std::tuple<int>, int> squarer{g, flow::serial, user_func};
-  simple_short_circuiter<std::tuple<int>, int> simple_squarer{g, flow::serial, user_func};
-
-  make_edge(src, squarer);
-  make_edge(src, simple_squarer);
-  make_edge(squarer, printer);
-  make_edge(simple_squarer, simple_printer);
-
-  src.activate();
-  g.wait_for_all();
+TEST_CASE("Optimized short circuiting")
+{
+  meld::timer timer_for_optimized{"squared numbers"};
+  test_short_circuit<short_circuiter<std::tuple<int>, int>>("squared numbers");
 }

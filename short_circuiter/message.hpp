@@ -16,6 +16,18 @@ namespace meld {
     ptr<T> data;
   };
 
+  template <typename T>
+  msg<std::remove_reference_t<T>> make_message(std::size_t i, T&& t)
+  {
+    return {.id = i, .data = std::make_shared<std::remove_reference_t<T>>(std::forward<T>(t))};
+  }
+
+  template <typename T>
+  msg<T> make_message(std::size_t i)
+  {
+    return {.id = i, .data = nullptr};
+  }
+
   template <typename... Ts>
   using msg_tuple = std::tuple<msg<Ts>...>;
 

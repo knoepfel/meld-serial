@@ -1,32 +1,32 @@
 #include "catch2/catch_test_macros.hpp"
 #include "oneapi/tbb/flow_graph.h"
+#include "serial/timed_busy.hpp"
 #include "short_circuiter/short_circuiter_node.hpp"
 #include "short_circuiter/simple_short_circuiter_node.hpp"
 #include "short_circuiter/timer.hpp"
 #include "spdlog/spdlog.h"
 
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <tuple>
 
 using namespace oneapi::tbb;
 using namespace meld;
+using namespace std::chrono_literals;
 
 namespace {
   template <typename T>
-  auto printer_for(tbb::flow::graph& g, std::string label)
+  flow::function_node<msg<T>> printer_for(tbb::flow::graph& g, std::string label)
   {
-    return flow::function_node<msg<T>>{
-      g, flow::unlimited, [name = std::move(label)](msg<T> const& m) {
-        if (m.data) {
-          spdlog::debug("{}: {}", name, *m.data);
-        }
-        else {
-          spdlog::debug("{}: empty", name);
-        }
-        return flow::continue_msg{};
-      }};
+    auto maybe_print_data = [name = std::move(label)](msg<T> const& m) {
+      if (m.data) {
+        spdlog::info("{}: {}", name, *m.data);
+      }
+      return flow::continue_msg{};
+    };
+    return {g, flow::unlimited, maybe_print_data};
   }
 
   template <typename ShortCircuiter>
@@ -43,9 +43,9 @@ namespace {
                            auto j = i++;
                            unsigned int id = j;
                            if (j % 2 == 0) {
-                             return {id, std::make_shared<int>(j)};
+                             return make_message(id, j);
                            }
-                           return {id, nullptr};
+                           return make_message<int>(id);
                          }};
 
     auto user_func = [](int const& n) { return n * n; };
@@ -62,12 +62,14 @@ namespace {
 
 TEST_CASE("Simple short circuiting")
 {
-  meld::timer timer_for_simple{"simply squared numbers"};
+  timer report_for_simple{"simply squared numbers"};
   test_short_circuit<simple_short_circuiter<std::tuple<int>, int>>("simply squared numbers");
 }
 
-TEST_CASE("Optimized short circuiting")
-{
-  meld::timer timer_for_optimized{"squared numbers"};
-  test_short_circuit<short_circuiter<std::tuple<int>, int>>("squared numbers");
-}
+// TEST_CASE("Optimized short circuiting")
+// {
+//   std::cout << std::endl;
+
+//   timer report_for_optimized{"squared numbers"};
+//   test_short_circuit<short_circuiter<std::tuple<int>, int>>("squared numbers");
+// }

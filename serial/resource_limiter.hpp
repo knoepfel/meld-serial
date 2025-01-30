@@ -5,16 +5,22 @@
 
 #include "oneapi/tbb/flow_graph.h"
 
-#include <map>
+#include <concepts>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace meld {
 
+  // ResourceHandle is the concept that all types that are used as "tokens"
+  // must model.
+  template <typename T>
+  concept ResourceHandle = std::semiregular<T>;
+
   class default_resource_token {};
 
-  template <typename Token = default_resource_token>
+  template <ResourceHandle Token = default_resource_token>
   class resource_limiter : public tbb::flow::buffer_node<Token const*> {
   public:
     using token_type = Token const*;
@@ -64,7 +70,7 @@ namespace meld {
   private:
     resource_limiter<int>& get(std::string const& name);
     tbb::flow::graph& graph_;
-    std::map<std::string, resource_limiter<int>> limiters_;
+    std::unordered_map<std::string, resource_limiter<int>> limiters_;
   };
 }
 

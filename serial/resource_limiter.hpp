@@ -1,0 +1,69 @@
+#ifndef meld_serial_resource_limiter_hpp
+#define meld_serial_resource_limiter_hpp
+
+#include "serial/sized_tuple.hpp"
+
+#include "oneapi/tbb/flow_graph.h"
+
+#include <map>
+#include <string>
+#include <tuple>
+#include <vector>
+
+namespace meld {
+
+  class default_resource_token {};
+
+  template <typename Token = default_resource_token>
+  class resource_limiter : public tbb::flow::buffer_node<Token const*> {
+  public:
+    explicit resource_limiter(tbb::flow::graph& g,
+                              std::string const& name,
+                              unsigned int n_tokens = 1) :
+      tbb::flow::buffer_node<Token const*>{g}, name_{name}
+    {
+      tokens_.reserve(n_tokens);
+      for (std::size_t i = 0; i != n_tokens; ++i) {
+        tokens_.emplace_back();
+      }
+    }
+
+    void activate()
+    {
+      // The serializer must not be activated until it resides in its final resting spot.
+      // IOW, if a container of resource limiters grows, the locations of the resource
+      // limiters can move around, introducing memory errors if try_put(...) has been
+      // attempted in a different location than when it's used during the graph execution.
+
+      // Place tokens into the buffer.
+      for (auto const& token : tokens_) {
+        tbb::flow::buffer_node<Token const*>::try_put(&token);
+      }
+    }
+
+    auto const& name() const { return name_; }
+
+  private:
+    std::string name_;
+    std::vector<Token> tokens_;
+  };
+
+  class resource_limiters {
+  public:
+    explicit resource_limiters(tbb::flow::graph& g);
+    void activate();
+
+    auto get(auto... resources) -> sized_tuple<resource_limiter<int>&, sizeof...(resources)>
+    {
+      // FIXME: Need to make sure there are no duplicates!
+      return std::tie(get(std::string(resources))...);
+    }
+
+  private:
+    resource_limiter<int>& get(std::string const& name);
+    tbb::flow::graph& graph_;
+    std::map<std::string, resource_limiter<int>> limiters_;
+  };
+}
+
+#endif /* meld_serial_resource_limiter_hpp */

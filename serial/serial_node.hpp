@@ -1,7 +1,7 @@
 #ifndef meld_serial_serial_node_hpp
 #define meld_serial_serial_node_hpp
 
-#include "serial/serializer_node.hpp"
+#include "serial/resource_limiter.hpp"
 #include "serial/sized_tuple.hpp"
 
 #include "oneapi/tbb/flow_graph.h"
@@ -24,6 +24,8 @@ namespace meld {
   template <typename InputTuple, typename OutputTuple>
   using base = tbb::flow::composite_node<InputTuple, OutputTuple>;
 
+  using token_t = int const*;
+
   template <typename Input, std::size_t N, typename Output = Input>
   class serial_node : public base<maybe_wrap_as_tuple_t<Input>, maybe_wrap_as_tuple_t<Output>> {
     using input_tuple = maybe_wrap_as_tuple_t<Input>;
@@ -37,11 +39,13 @@ namespace meld {
       (make_edge(std::get<I>(serializers), input_port<I + 1>(join_)), ...);
     }
 
-    template <typename Serializers, std::size_t... I>
-    void return_tokens(Serializers serialized_resources [[maybe_unused]], std::index_sequence<I...>)
+    template <typename Serializers, typename Tuple, std::size_t... I>
+    void return_tokens(Serializers serialized_resources [[maybe_unused]],
+                       Tuple const& tuple [[maybe_unused]],
+                       std::index_sequence<I...>)
     {
       // FIXME: Might want to return the received tokens instead of just '1'.
-      (std::get<I>(serialized_resources).try_put(1), ...);
+      (std::get<I>(serialized_resources).try_put(std::get<I>(tuple)), ...);
     }
 
     template <typename FT, typename Serializers, std::size_t... I>
@@ -58,9 +62,9 @@ namespace meld {
         concurrency,
         [serialized_resources = std::move(serializers), function = std::move(f), iseq, this](
           join_tuple const& tup) mutable {
-          auto input = std::get<0>(tup);
+          auto [input, tokens] = pop_head(tup);
           auto output = function(input);
-          return_tokens(serialized_resources, iseq);
+          return_tokens(serialized_resources, tokens, iseq);
           return output;
         }}
     {

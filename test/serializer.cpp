@@ -24,7 +24,7 @@ void serialize_functions_based_on_resource()
                          return 0u;
                        }};
 
-  serializers serialized_resources{g};
+  resource_limiters serialized_resources{g};
 
   std::atomic<unsigned int> root_counter{}, genie_counter{};
 
@@ -96,7 +96,7 @@ void serialize_functions_when_splitting_then_merging()
                          return 0u;
                        }};
 
-  serializers serialized_resources{g};
+  resource_limiters serialized_resources{g};
 
   std::atomic<unsigned int> root_counter{};
 

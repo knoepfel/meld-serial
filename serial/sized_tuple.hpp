@@ -31,6 +31,15 @@ namespace meld {
 
   template <typename... T>
   using concatenated_tuples = decltype(std::tuple_cat(std::declval<T>()...));
+
+  template <typename Head, typename... Tail>
+  std::pair<Head, std::tuple<Tail...>> pop_head(std::tuple<Head, Tail...> const& tup)
+  {
+    auto tuple_from_tail = []<std::size_t... Is>(auto const& t, std::index_sequence<Is...>) {
+      return std::make_tuple(std::get<Is + 1>(t)...);
+    };
+    return {std::get<0>(tup), tuple_from_tail(tup, std::make_index_sequence<sizeof...(Tail)>{})};
+  }
 }
 
 #endif /* meld_serial_sized_tuple_hpp */

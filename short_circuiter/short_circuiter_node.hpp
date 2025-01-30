@@ -29,7 +29,8 @@ namespace meld {
     short_circuiter(tbb::flow::graph& g, std::size_t concurrency, FT f) :
       base_t{g},
       joiner_{make_join<join_t, input_msgs_t>(g, in_sequence_t{})},
-      router_{g, tbb::flow::unlimited, [this](msg_tuple_t const& msgs) noexcept { return route(msgs); }},
+      router_{
+        g, tbb::flow::unlimited, [this](msg_tuple_t const& msgs) noexcept { return route(msgs); }},
       wrapped_user_func_{g,
                          concurrency,
                          [func = std::move(f)](msg_tuple_t const& msgs) {

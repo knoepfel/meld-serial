@@ -29,9 +29,7 @@ void serialize_functions_based_on_resource()
   std::atomic<unsigned int> root_counter{}, genie_counter{};
 
   serial_node<unsigned int, 1> node1{
-    g,
-    serialized_resources.get("ROOT"),
-    [&root_counter](unsigned int const i) {
+    g, serialized_resources.get("ROOT"), [&root_counter](unsigned int const i) {
       thread_counter c{root_counter};
       spdlog::info("Processing from node 1 {}", i);
       return i;

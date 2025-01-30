@@ -17,10 +17,12 @@ namespace meld {
   template <typename Token = default_resource_token>
   class resource_limiter : public tbb::flow::buffer_node<Token const*> {
   public:
+    using token_type = Token const*;
+
     explicit resource_limiter(tbb::flow::graph& g,
                               std::string const& name,
                               unsigned int n_tokens = 1) :
-      tbb::flow::buffer_node<Token const*>{g}, name_{name}
+      tbb::flow::buffer_node<token_type>{g}, name_{name}
     {
       tokens_.reserve(n_tokens);
       for (std::size_t i = 0; i != n_tokens; ++i) {
@@ -37,7 +39,7 @@ namespace meld {
 
       // Place tokens into the buffer.
       for (auto const& token : tokens_) {
-        tbb::flow::buffer_node<Token const*>::try_put(&token);
+        tbb::flow::buffer_node<token_type>::try_put(&token);
       }
     }
 

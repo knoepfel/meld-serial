@@ -1,6 +1,7 @@
 #ifndef meld_serial_serial_node_hpp
 #define meld_serial_serial_node_hpp
 
+#include "metaprogramming/type_deduction.hpp"
 #include "serial/resource_limiter.hpp"
 #include "serial/sized_tuple.hpp"
 
@@ -26,12 +27,12 @@ namespace meld {
 
   using token_t = int const*;
 
-  template <typename Input, std::size_t N, typename Output = Input>
+  template <typename Input, typename Output, typename Resources = std::tuple<>>
   class serial_node : public base<maybe_wrap_as_tuple_t<Input>, maybe_wrap_as_tuple_t<Output>> {
     using input_tuple = maybe_wrap_as_tuple_t<Input>;
     using output_tuple = maybe_wrap_as_tuple_t<Output>;
     using base_t = base<input_tuple, output_tuple>;
-    using join_tuple = concatenated_tuples<input_tuple, sized_tuple<token_t, N>>;
+    using join_tuple = concatenated_tuples<input_tuple, Resources>;
 
     template <typename Serializers, std::size_t... I>
     void make_serializer_edges(std::index_sequence<I...>, Serializers const& serializers)
@@ -100,6 +101,16 @@ namespace meld {
     tbb::flow::join_node<join_tuple, tbb::flow::reserving> join_;
     tbb::flow::function_node<join_tuple, Output> serialized_function_;
   };
+
+  template <typename FT, typename... Ts>
+  serial_node(tbb::flow::graph&, std::tuple<Ts&...>, FT)
+    -> serial_node<function_parameter_type<0, FT>,
+                   return_type<FT>,
+                   std::tuple<typename Ts::token_type...>>;
+
+  template <typename FT, std::convertible_to<int> T>
+  serial_node(tbb::flow::graph&, T, FT)
+    -> serial_node<function_parameter_type<0, FT>, return_type<FT>, std::tuple<>>;
 }
 
 #endif /* meld_serial_serial_node_hpp */

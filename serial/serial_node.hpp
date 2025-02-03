@@ -9,22 +9,40 @@
 
 namespace meld {
 
+  //--------------------------------------------------------------------------
+  // maybe_wrap_as_tuple wraps a type T into a tuple if it is not already a
+  // tuple. The nested type tuple is and std::tuple<T>, regardless of whether
+  // T is a tuple or not.
+  //
+  // maybe_wrap_as_tuple_t<T> is a convenience alias for the nested type.
+
+  // General case: wrap T into a tuple
   template <typename T>
   struct maybe_wrap_as_tuple {
     using type = std::tuple<T>;
   };
 
+  // Special case: T is already a tuple
   template <typename... Ts>
   struct maybe_wrap_as_tuple<std::tuple<Ts...>> {
     using type = std::tuple<Ts...>;
   };
 
+  // Convenience alias
   template <typename T>
   using maybe_wrap_as_tuple_t = typename maybe_wrap_as_tuple<T>::type;
 
+  //--------------------------------------------------------------------------
+  // class serial_node<Input, N, Output> is a composite_node<Input, Output>
+  // that also waits to obtain a collection of N tokens of type token_t
+  // from several serializers.
+  // base<InputTuple, OutputTuple> is a an alias for a composite_node
+  // with the given input and output tuple types.
   template <typename InputTuple, typename OutputTuple>
   using base = tbb::flow::composite_node<InputTuple, OutputTuple>;
 
+  // This implementation of serial_node uses a bare pointer-to-int as
+  // the token type.
   using token_t = int const*;
 
   template <typename Input, typename Output, typename Resources = std::tuple<>>
@@ -49,6 +67,7 @@ namespace meld {
       (std::get<I>(serialized_resources).try_put(std::get<I>(tuple)), ...);
     }
 
+    // Private constructor, used in the impelementation of the public constructor.
     template <typename FT, typename Serializers, std::size_t... I>
     explicit serial_node(tbb::flow::graph& g,
                          std::size_t concurrency,
@@ -84,6 +103,19 @@ namespace meld {
     {
     }
 
+    /**
+    * @brief Constructs a serial_node with a specified flow graph, serializers, and function.
+    *
+    * This constructor initializes a serial_node that will operate on the given flow graph,
+    * use the provided serializers, and execute the specified function. The execution
+    * policy is determined based on the number of serializers.
+    *
+    * @tparam FT The type of the function to be executed.
+    * @tparam Serializers The types of the serializers to be used.
+    * @param g The TBB flow graph to which this node belongs.
+    * @param serializers A tuple containing references to the serializers.
+    * @param f The function to be executed by the node.
+    */
     template <typename FT, typename... Serializers>
     explicit serial_node(tbb::flow::graph& g,
                          std::tuple<Serializers&...> const& serializers,

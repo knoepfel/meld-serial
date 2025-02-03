@@ -97,6 +97,12 @@ namespace meld {
     }
 
   public:
+    template <typename FT>
+    explicit serial_node(tbb::flow::graph& g, std::size_t concurrency, FT f) :
+      serial_node{g, concurrency, std::move(f), std::tuple{}, std::make_index_sequence<0>{}}
+    {
+    }
+
     /**
     * @brief Constructs a serial_node with a specified flow graph, serializers, and function.
     *
@@ -110,12 +116,6 @@ namespace meld {
     * @param serializers A tuple containing references to the serializers.
     * @param f The function to be executed by the node.
     */
-    template <typename FT>
-    explicit serial_node(tbb::flow::graph& g, std::size_t concurrency, FT f) :
-      serial_node{g, concurrency, std::move(f), std::tuple{}, std::make_index_sequence<0>{}}
-    {
-    }
-
     template <typename FT, typename... Serializers>
     explicit serial_node(tbb::flow::graph& g,
                          std::tuple<Serializers&...> const& serializers,

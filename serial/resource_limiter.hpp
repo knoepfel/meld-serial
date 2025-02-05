@@ -56,6 +56,9 @@ namespace meld {
     std::vector<Token> tokens_;
   };
 
+  // TODO:
+  // Consider removing this. That means tests need to directly make their
+  // own resource_limiter objects.
   class resource_limiters {
   public:
     explicit resource_limiters(tbb::flow::graph& g);

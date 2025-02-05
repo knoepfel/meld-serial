@@ -63,7 +63,6 @@ namespace meld {
                        Tuple const& tuple [[maybe_unused]],
                        std::index_sequence<I...>)
     {
-      // FIXME: Might want to return the received tokens instead of just '1'.
       (std::get<I>(serialized_resources).try_put(std::get<I>(tuple)), ...);
     }
 
@@ -111,20 +110,20 @@ namespace meld {
     * policy is determined based on the number of serializers.
     *
     * @tparam FT The type of the function to be executed.
-    * @tparam Serializers The types of the serializers to be used.
-    * @param g The TBB flow graph to which this node belongs.
+    * @tparam ResourceLimiters The types of the serializers to be used.
+    * @param g The TBB flow graph to which this node will be added.
     * @param serializers A tuple containing references to the serializers.
     * @param f The function to be executed by the node.
     */
-    template <typename FT, typename... Serializers>
+    template <typename FT, typename... ResourceLimiters>
     explicit serial_node(tbb::flow::graph& g,
-                         std::tuple<Serializers&...> const& serializers,
+                         std::tuple<ResourceLimiters&...> const& serializers,
                          FT f) :
       serial_node{g,
-                  (sizeof...(Serializers) > 0 ? tbb::flow::serial : tbb::flow::unlimited),
+                  (sizeof...(ResourceLimiters) > 0 ? tbb::flow::serial : tbb::flow::unlimited),
                   std::move(f),
                   serializers,
-                  std::make_index_sequence<sizeof...(Serializers)>{}}
+                  std::make_index_sequence<sizeof...(ResourceLimiters)>{}}
     {
     }
 
@@ -134,12 +133,19 @@ namespace meld {
     tbb::flow::function_node<join_tuple, Output> serialized_function_;
   };
 
+  // Deduction guide.
+  // If the user provides a callable type and a tuple of token types, we can deduce
+  // the input and output types (and the tuple of resources).
   template <typename FT, typename... Ts>
   serial_node(tbb::flow::graph&, std::tuple<Ts&...>, FT)
-    -> serial_node<function_parameter_type<0, FT>,
-                   return_type<FT>,
-                   std::tuple<typename Ts::token_type...>>;
+    -> serial_node<function_parameter_type<0, FT>,          // Input
+                   return_type<FT>,                         // Output
+                   std::tuple<typename Ts::token_type...>>; // Resources
 
+  // Deduction guide.
+  // If the user provides a callable type and an integer, we can deduce the input
+  // and output types. The result is a serial_node that does not serialize on
+  // any resources, but has the specified concurrency.
   template <typename FT, std::convertible_to<int> T>
   serial_node(tbb::flow::graph&, T, FT)
     -> serial_node<function_parameter_type<0, FT>, return_type<FT>, std::tuple<>>;

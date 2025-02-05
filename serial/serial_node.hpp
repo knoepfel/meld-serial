@@ -96,6 +96,18 @@ namespace meld {
     }
 
   public:
+    /**
+    * @brief Constructs a serial_node with a specified flow graph, concurrency and function.
+    *
+    * This constructor initializes a serial_node that will be added to the given flow graph 
+    * and execute the specified function. The number of serializers is 0. The node will have
+    * the specified concurrency.
+    *
+    * @tparam FT The type of the function to be executed.
+    * @param g The TBB flow graph to which this node will be added.
+    * @param concurrency The concurrency level for the serialized function.
+    * @param f The function to be executed by the serialized function.
+    */
     template <typename FT>
     explicit serial_node(tbb::flow::graph& g, std::size_t concurrency, FT f) :
       serial_node{g, concurrency, std::move(f), std::tuple{}, std::make_index_sequence<0>{}}

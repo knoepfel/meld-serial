@@ -1,6 +1,10 @@
-add_executable(serializer serializer.cpp)
-target_link_libraries(serializer PRIVATE meld::serial spdlog::spdlog)
-add_test(NAME test_serializer COMMAND serializer)
+add_executable(serial_diamond serial_diamond.cpp)
+target_link_libraries(serial_diamond PRIVATE meld::serial spdlog::spdlog)
+add_test(NAME test_serial_diamond COMMAND serial_diamond)
+
+add_executable(serial_fanout serial_fanout.cpp)
+target_link_libraries(serial_fanout PRIVATE meld::serial spdlog::spdlog)
+add_test(NAME test_serial_fanout COMMAND serial_fanout)
 
 add_executable(reduction reduction.cpp)
 target_link_libraries(reduction PRIVATE meld::reduction spdlog::spdlog)

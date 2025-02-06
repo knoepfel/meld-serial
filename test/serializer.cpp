@@ -31,9 +31,11 @@ void serialize_functions_based_on_resource()
 
   std::atomic<unsigned int> root_counter{};
   std::atomic<unsigned int> genie_counter{};
+  std::atomic<unsigned int> db_counter{};
 
   resource_limiter root_limiter{g, "ROOT", 1};
   resource_limiter genie_limiter{g, "GENIE", 1};
+  resource_limiter db_limiter{g, "DB", 2};
 
   serial_node histogrammer{
     g, std::tie(root_limiter), [&root_counter](unsigned int const i) -> unsigned int {
@@ -70,13 +72,42 @@ void serialize_functions_based_on_resource()
                            return i;
                          }};
 
+  // Nodes that use the DB resource limited to 2 tokens
+  serial_node calibratorA{
+    g, std::tie(db_limiter), [&db_counter](unsigned int const i) -> unsigned int {
+      thread_counter c{db_counter, 2};
+      spdlog::info("Calibrating[A] {}", i);
+      timed_busy(10ms);
+      return i;
+    }};
+
+  serial_node calibratorB{
+    g, std::tie(db_limiter), [&db_counter](unsigned int const i) -> unsigned int {
+      thread_counter c{db_counter, 2};
+      spdlog::info("Calibrating[B] {}", i);
+      timed_busy(10ms);
+      return i;
+    }};
+
+  serial_node calibratorC{
+    g, std::tie(db_limiter), [&db_counter](unsigned int const i) -> unsigned int {
+      thread_counter c{db_counter, 2};
+      spdlog::info("Calibrating[C] {}", i);
+      timed_busy(10ms);
+      return i;
+    }};
+
   make_edge(src, histogrammer);
   make_edge(src, histo_generator);
   make_edge(src, generator);
   make_edge(src, propagator);
+  make_edge(src, calibratorA);
+  make_edge(src, calibratorB);
+  make_edge(src, calibratorC);
 
   root_limiter.activate();
   genie_limiter.activate();
+  db_limiter.activate();
   src.activate();
 
   g.wait_for_all();

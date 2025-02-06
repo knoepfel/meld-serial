@@ -41,10 +41,6 @@ namespace meld {
   template <typename InputTuple, typename OutputTuple>
   using base = tbb::flow::composite_node<InputTuple, OutputTuple>;
 
-  // This implementation of serial_node uses a bare pointer-to-int as
-  // the token type.
-  using token_t = int const*;
-
   template <typename Input, typename Output, typename Resources = std::tuple<>>
   class serial_node : public base<maybe_wrap_as_tuple_t<Input>, maybe_wrap_as_tuple_t<Output>> {
     using input_tuple = maybe_wrap_as_tuple_t<Input>;
@@ -99,7 +95,7 @@ namespace meld {
     /**
     * @brief Constructs a serial_node with a specified flow graph, concurrency and function.
     *
-    * This constructor initializes a serial_node that will be added to the given flow graph 
+    * This constructor initializes a serial_node that will be added to the given flow graph
     * and execute the specified function. The number of serializers is 0. The node will have
     * the specified concurrency.
     *

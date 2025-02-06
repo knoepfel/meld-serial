@@ -1,5 +1,4 @@
 add_library(meld_serial SHARED
-  resource_limiter.cpp
   timed_busy.cpp
 )
 target_include_directories(meld_serial PRIVATE ${PROJECT_SOURCE_DIR})

@@ -1,5 +1,6 @@
 #include "serial/serial_node.hpp"
 #include "serial/thread_counter.hpp"
+#include "serial/timed_busy.hpp"
 
 #include "oneapi/tbb/flow_graph.h"
 #include "spdlog/spdlog.h"
@@ -8,6 +9,7 @@
 #include <iostream>
 #include <string>
 
+using namespace std::chrono_literals;
 using namespace meld;
 using namespace oneapi::tbb;
 
@@ -18,67 +20,65 @@ void serialize_functions_based_on_resource()
   unsigned int i{};
   flow::input_node src{g, [&i](flow_control& fc) {
                          if (i < 10) {
-                           return ++i;
+                           auto j = ++i;
+                           spdlog::info("-> Emitting {}", j);
+                           return j;
                          }
+                         spdlog::info("=> Source all done");
                          fc.stop();
                          return 0u;
                        }};
 
-  resource_limiters serialized_resources{g};
+  std::atomic<unsigned int> root_counter{};
+  std::atomic<unsigned int> genie_counter{};
 
-  std::atomic<unsigned int> root_counter{}, genie_counter{};
+  resource_limiter root_limiter{g, "ROOT", 1};
+  resource_limiter genie_limiter{g, "GENIE", 1};
 
-  serial_node node1{
-    g, serialized_resources.get("ROOT"), [&root_counter](unsigned int const i) -> unsigned int {
+  serial_node histogrammer{
+    g, std::tie(root_limiter), [&root_counter](unsigned int const i) -> unsigned int {
       thread_counter c{root_counter};
-      spdlog::info("Processing from node 1 {}", i);
+      spdlog::info("Histogramming {}", i);
+      timed_busy(10ms);
       return i;
     }};
 
-  serial_node node2{g,
-                    serialized_resources.get("ROOT", "GENIE"),
-                    [&root_counter, &genie_counter](unsigned int const i) -> unsigned int {
-                      thread_counter c1{root_counter};
-                      thread_counter c2{genie_counter};
-                      spdlog::info("Processing from node 2 {}", i);
-                      return i;
-                    }};
+  serial_node histo_generator{
+    g,
+    std::tie(root_limiter, genie_limiter),
+    [&root_counter, &genie_counter](unsigned int const i) -> unsigned int {
+      thread_counter c1{root_counter};
+      thread_counter c2{genie_counter};
+      spdlog::info("Histo-generating {}", i);
+      timed_busy(10ms);
+      spdlog::info("Done histo-generating {}", i);
+      return i;
+    }};
 
-  serial_node node3{
-    g, serialized_resources.get("GENIE"), [&genie_counter](unsigned int const i) -> unsigned int {
+  serial_node generator{
+    g, std::tie(genie_limiter), [&genie_counter](unsigned int const i) -> unsigned int {
       thread_counter c{genie_counter};
-      spdlog::info("Processing from node 3 {}", i);
+      spdlog::info("Generating {}", i);
+      timed_busy(10ms);
       return i;
     }};
 
-  serial_node node4{
-    g, tbb::flow::unlimited, [](unsigned int const i) -> unsigned int { return i; }};
+  serial_node propagator{g, tbb::flow::unlimited, [](unsigned int const i) -> unsigned int {
+                           spdlog::info("Propagating {}", i);
+                           timed_busy(250ms);
+                           spdlog::info("Done propagating {}", i);
+                           return i;
+                         }};
 
-  auto receiving_node_for = [](tbb::flow::graph& g, std::string const& label) {
-    return flow::function_node<unsigned int, unsigned int>{
-      g, flow::unlimited, [label](unsigned int const i) {
-        spdlog::info("Processed {} task {}", label, i);
-        return i;
-      }};
-  };
+  make_edge(src, histogrammer);
+  make_edge(src, histo_generator);
+  make_edge(src, generator);
+  make_edge(src, propagator);
 
-  auto receiving_node_1 = receiving_node_for(g, "ROOT");
-  auto receiving_node_2 = receiving_node_for(g, "ROOT/GENIE");
-  auto receiving_node_3 = receiving_node_for(g, "GENIE");
-  auto receiving_node_4 = receiving_node_for(g, "unlimited");
-
-  make_edge(src, node1);
-  make_edge(src, node2);
-  make_edge(src, node3);
-  make_edge(src, node4);
-
-  make_edge(node1, receiving_node_1);
-  make_edge(node2, receiving_node_2);
-  make_edge(node3, receiving_node_3);
-  make_edge(node4, receiving_node_4);
-
-  serialized_resources.activate();
+  root_limiter.activate();
+  genie_limiter.activate();
   src.activate();
+
   g.wait_for_all();
 }
 
@@ -94,14 +94,12 @@ void serialize_functions_when_splitting_then_merging()
                          return 0u;
                        }};
 
-  resource_limiters serialized_resources{g};
-
   std::atomic<unsigned int> root_counter{};
+  resource_limiter root_limiter{g, "ROOT", 1};
 
-  auto root_resource = serialized_resources.get("ROOT");
-  auto serial_node_for = [&root_resource, &root_counter](auto& g, int label) {
+  auto serial_node_for = [&root_limiter, &root_counter](auto& g, int label) {
     return serial_node{
-      g, root_resource, [&root_counter, label](unsigned int const i) -> unsigned int {
+      g, std::tie(root_limiter), [&root_counter, label](unsigned int const i) -> unsigned int {
         thread_counter c{root_counter};
         spdlog::info("Processing from node {} {}", label, i);
         return i;
@@ -117,8 +115,9 @@ void serialize_functions_when_splitting_then_merging()
   make_edge(node1, node3);
   make_edge(node2, node3);
 
-  serialized_resources.activate();
+  root_limiter.activate();
   src.activate();
+
   g.wait_for_all();
 }
 

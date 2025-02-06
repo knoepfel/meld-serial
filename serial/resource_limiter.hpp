@@ -55,26 +55,6 @@ namespace meld {
     std::string name_;
     std::vector<Token> tokens_;
   };
-
-  // TODO:
-  // Consider removing this. That means tests need to directly make their
-  // own resource_limiter objects.
-  class resource_limiters {
-  public:
-    explicit resource_limiters(tbb::flow::graph& g);
-    void activate();
-
-    auto get(auto... resources) -> sized_tuple<resource_limiter<int>&, sizeof...(resources)>
-    {
-      // FIXME: Need to make sure there are no duplicates!
-      return std::tie(get(std::string(resources))...);
-    }
-
-  private:
-    resource_limiter<int>& get(std::string const& name);
-    tbb::flow::graph& graph_;
-    std::unordered_map<std::string, resource_limiter<int>> limiters_;
-  };
 }
 
 #endif /* meld_serial_resource_limiter_hpp */

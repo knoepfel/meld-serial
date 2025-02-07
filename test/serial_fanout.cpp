@@ -13,6 +13,18 @@ using namespace std::chrono_literals;
 using namespace meld;
 using namespace oneapi::tbb;
 
+// ROOT is the representation of the ROOT resource.
+struct ROOT {};
+
+// GENIE is the representation of the GENIE resource.
+struct GENIE {};
+
+// DB is the representation of the DB resource.
+// The value id is the database ID.
+struct DB {
+  unsigned int id;
+};
+
 void serialize_functions_based_on_resource()
 {
   std::cout << "Serialize functions based on resource\n" << std::endl;
@@ -34,6 +46,11 @@ void serialize_functions_based_on_resource()
   std::atomic<unsigned int> root_counter{};
   std::atomic<unsigned int> genie_counter{};
   std::atomic<unsigned int> db_counter{};
+
+  // Declare our resource handles.
+  [[maybe_unused]] ROOT root;
+  [[maybe_unused]] GENIE genie;
+  [[maybe_unused]] std::tuple databases{1, 2};
 
   resource_limiter root_limiter{g, "ROOT", 1};
   resource_limiter genie_limiter{g, "GENIE", 1};

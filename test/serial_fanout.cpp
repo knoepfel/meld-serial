@@ -29,6 +29,8 @@ void serialize_functions_based_on_resource()
                          return 0u;
                        }};
 
+  // Declare the counters that we use to verify that the resource constraints
+  // are being met.
   std::atomic<unsigned int> root_counter{};
   std::atomic<unsigned int> genie_counter{};
   std::atomic<unsigned int> db_counter{};
@@ -67,7 +69,7 @@ void serialize_functions_based_on_resource()
 
   serial_node propagator{g, tbb::flow::unlimited, [](unsigned int const i) -> unsigned int {
                            spdlog::info("Propagating {}", i);
-                           timed_busy(250ms);
+                           timed_busy(150ms);
                            spdlog::info("Done propagating {}", i);
                            return i;
                          }};

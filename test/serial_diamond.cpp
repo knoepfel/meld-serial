@@ -25,7 +25,7 @@ void serialize_functions_when_splitting_then_merging()
                        }};
 
   std::atomic<unsigned int> root_counter{};
-  resource_limiter root_limiter{g, "ROOT", 1};
+  resource_limiter root_limiter{g, 1};
 
   auto serial_node_for = [&root_limiter, &root_counter](auto& g, int label) {
     return serial_node{

@@ -13,22 +13,28 @@
 
 namespace meld {
 
-  // ResourceHandle is the concept that all types that are used as "tokens"
-  // must model.
-  template <typename T>
-  concept ResourceHandle = std::semiregular<T>;
-
-  // default_resource_handle models the ResourceHandle concept.
+  // ----------------------------------------------------------------------------
+  // default_resource_handle is a handle that controls no resource. It is a stateless
+  // object. It is intended to be used to limit access to resources or facilities that
+  // do not require any state to describe the resource.
   class default_resource_handle {};
 
   //----------------------------------------------------------------------------
-  // resource_limiter<ResourceHandle> is designed to limit the availability
-  // of a resource associated with the ResourceHandle type.  It does this
-  // by managing one or more tokens of the type ResourceHandle, with the
-  // intention that the controlled resource can not be used without a token.
-  template <ResourceHandle Handle = default_resource_handle>
+  // resource_limiter<Handle> is designed to limit the availability
+  // of a resource associated with the Handle type.  It does this
+  // by managing one or more objects of the type Handle, with the
+  // intention that the controlled resource can not be used without a token that
+  // points to the handle. The resource_limiter owns the handles, and thus the
+  // resources with which they are associated.
+  template <typename Handle = default_resource_handle>
   class resource_limiter : public tbb::flow::buffer_node<Handle const*> {
   public:
+    // Resources limiters are not copyable but are movable.
+    resource_limiter(resource_limiter const&) = delete;
+    resource_limiter& operator=(resource_limiter const&) = delete;
+    resource_limiter(resource_limiter&&) = default;
+    resource_limiter& operator=(resource_limiter&&) = default;
+
     using token_type = Handle const*;
 
     /// \brief Constructs a resource_limiter with \a n_tokens tokens of type \a Handle.
@@ -37,19 +43,18 @@ namespace meld {
     /// resource_limiter is constructed.  The resource_limiter is a
     /// buffer_node<Handle> so that the try_put() function can be used to
     /// "return" a token to the resource_limiter.
-    explicit resource_limiter(tbb::flow::graph& g,
-                              std::string const& name,
-                              unsigned int n_tokens = 1) :
-      tbb::flow::buffer_node<token_type>{g}, name_{name}
+    explicit resource_limiter(tbb::flow::graph& g, unsigned int n_handles = 1) :
+      tbb::flow::buffer_node<token_type>{g}, handles_(n_handles)
     {
-      tokens_.reserve(n_tokens);
-      for (std::size_t i = 0; i != n_tokens; ++i) {
-        tokens_.emplace_back();
-      }
     }
 
-    /// \brief Activate the resource_limiter by placing all of the tokens it
-    /// manages into its buffer.
+    explicit resource_limiter(tbb::flow::graph& g, std::vector<Handle>&& handles) :
+      tbb::flow::buffer_node<token_type>{g}, handles_(std::move(handles))
+    {
+    }
+
+    /// \brief Activate the resource_limiter by placing one token to each handle
+    /// it manages into its buffer.
     ///
     /// This function must be called before the flow graph is started.  It
     /// is not automatically called by the constructor because the
@@ -61,18 +66,13 @@ namespace meld {
     void activate()
     {
       // Place tokens into the buffer.
-      for (auto const& token : tokens_) {
-        tbb::flow::buffer_node<token_type>::try_put(&token);
+      for (auto const& handle : handles_) {
+        tbb::flow::buffer_node<token_type>::try_put(&handle);
       }
     }
 
-    /// \brief Return the name of the resource_limiter
-    /// @return a const reference to the name
-    auto const& name() const { return name_; }
-
   private:
-    std::string name_;
-    std::vector<Handle> tokens_;
+    std::vector<Handle> handles_;
   };
 }
 

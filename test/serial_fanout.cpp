@@ -47,14 +47,11 @@ void serialize_functions_based_on_resource()
   std::atomic<unsigned int> genie_counter{};
   std::atomic<unsigned int> db_counter{};
 
-  // Declare our resource handles.
-  [[maybe_unused]] ROOT root;
-  [[maybe_unused]] GENIE genie;
-  [[maybe_unused]] std::tuple databases{1, 2};
+  std::vector<DB> database_handles{DB{1}, DB{13}};
 
-  resource_limiter root_limiter{g, "ROOT", 1};
-  resource_limiter genie_limiter{g, "GENIE", 1};
-  resource_limiter db_limiter{g, "DB", 2};
+  resource_limiter<ROOT> root_limiter{g, 1};
+  resource_limiter<GENIE> genie_limiter{g, 1};
+  resource_limiter<DB> db_limiter{g, std::move(database_handles)};
 
   serial_node histogrammer{
     g, std::tie(root_limiter), [&root_counter](unsigned int const i) -> unsigned int {
@@ -92,6 +89,8 @@ void serialize_functions_based_on_resource()
                          }};
 
   // Nodes that use the DB resource limited to 2 tokens
+  // TODO: figure out how we pass the token into the user's function, which need to be
+  // able to access the stateful resource handle.
   serial_node calibratorA{
     g, std::tie(db_limiter), [&db_counter](unsigned int const i) -> unsigned int {
       thread_counter c{db_counter, 2};

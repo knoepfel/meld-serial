@@ -18,24 +18,24 @@ namespace meld {
   template <typename T>
   concept ResourceHandle = std::semiregular<T>;
 
-  // default_resource_token models the ResourceHandle concept.
-  class default_resource_token {};
+  // default_resource_handle models the ResourceHandle concept.
+  class default_resource_handle {};
 
   //----------------------------------------------------------------------------
   // resource_limiter<ResourceHandle> is designed to limit the availability
   // of a resource associated with the ResourceHandle type.  It does this
   // by managing one or more tokens of the type ResourceHandle, with the
   // intention that the controlled resource can not be used without a token.
-  template <ResourceHandle Token = default_resource_token>
-  class resource_limiter : public tbb::flow::buffer_node<Token const*> {
+  template <ResourceHandle Handle = default_resource_handle>
+  class resource_limiter : public tbb::flow::buffer_node<Handle const*> {
   public:
-    using token_type = Token const*;
+    using token_type = Handle const*;
 
-    /// \brief Constructs a resource_limiter with \a n_tokens tokens of type \a Token.
+    /// \brief Constructs a resource_limiter with \a n_tokens tokens of type \a Handle.
     ///
     /// The tokens are stored in a vector and are all "available" when the
     /// resource_limiter is constructed.  The resource_limiter is a
-    /// buffer_node<Token> so that the try_put() function can be used to
+    /// buffer_node<Handle> so that the try_put() function can be used to
     /// "return" a token to the resource_limiter.
     explicit resource_limiter(tbb::flow::graph& g,
                               std::string const& name,
@@ -72,7 +72,7 @@ namespace meld {
 
   private:
     std::string name_;
-    std::vector<Token> tokens_;
+    std::vector<Handle> tokens_;
   };
 }
 

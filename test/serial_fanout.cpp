@@ -47,11 +47,11 @@ void serialize_functions_based_on_resource()
   std::atomic<unsigned int> genie_counter{};
   std::atomic<unsigned int> db_counter{};
 
-  std::vector<DB> database_handles{DB{1}, DB{13}};
-
   resource_limiter<ROOT> root_limiter{g, 1};
   resource_limiter<GENIE> genie_limiter{g, 1};
-  resource_limiter<DB> db_limiter{g, std::move(database_handles)};
+  // We can use a temporary vector to create the DB objects that will
+  // be owned by db_limiter.
+  resource_limiter<DB> db_limiter{g, {DB{1}, DB{13}}};
 
   serial_node histogrammer{
     g, std::tie(root_limiter), [&root_counter](unsigned int const i) -> unsigned int {

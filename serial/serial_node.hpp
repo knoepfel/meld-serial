@@ -64,6 +64,21 @@ namespace meld {
       (std::get<I>(serialized_resources).try_put(std::get<I>(tuple)), ...);
     }
 
+    template <typename FT>
+    Output invoke_function(FT const& function,
+                           Input const& input [[maybe_unused]],
+                           join_tuple const& tup [[maybe_unused]]) const
+    {
+      if constexpr (requires {
+                      { function(input) };
+                    }) {
+        return function(input);
+      }
+      else {
+        return std::apply(function, tup);
+      }
+    }
+
     // Private constructor, used in the impelementation of the public constructor.
     template <typename FT, typename Serializers, std::size_t... I>
     explicit serial_node(tbb::flow::graph& g,
@@ -80,18 +95,9 @@ namespace meld {
         [serialized_resources = std::move(serializers), function = std::move(f), iseq, this](
           join_tuple const& tup) mutable {
           auto [input, tokens] = pop_head(tup);
-          if constexpr (requires {
-                          { function(input) };
-                        }) {
-            auto output = function(input);
-            return_tokens(serialized_resources, tokens, iseq);
-            return output;
-          }
-          else {
-            auto output = std::apply(function, tup);
-            return_tokens(serialized_resources, tokens, iseq);
-            return output;
-          }
+          auto output = invoke_function(function, input, tup);
+          return_tokens(serialized_resources, tokens, iseq);
+          return output;
         }}
     {
       // Need way to route null messages around the join.

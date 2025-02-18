@@ -53,40 +53,40 @@ void serialize_functions_based_on_resource()
   // be owned by db_limiter.
   resource_limiter<DB> db_limiter{g, {DB{1}, DB{13}}};
 
-  serial_node histogrammer{
-    g, std::tie(root_limiter), [&root_counter](unsigned int const i) -> unsigned int {
-      thread_counter c{root_counter};
-      spdlog::info("Histogramming {}", i);
-      timed_busy(10ms);
-      return i;
-    }};
+  auto fill_histo = [&root_counter](unsigned int const i) -> unsigned int {
+    thread_counter c{root_counter};
+    spdlog::info("Histogramming {}", i);
+    timed_busy(10ms);
+    return i;
+  };
 
-  serial_node histo_generator{
-    g,
-    std::tie(root_limiter, genie_limiter),
-    [&root_counter, &genie_counter](unsigned int const i) -> unsigned int {
-      thread_counter c1{root_counter};
-      thread_counter c2{genie_counter};
-      spdlog::info("Histo-generating {}", i);
-      timed_busy(10ms);
-      spdlog::info("Done histo-generating {}", i);
-      return i;
-    }};
+  auto gen_fill_histo = [&root_counter, &genie_counter](unsigned int const i) -> unsigned int {
+    thread_counter c1{root_counter};
+    thread_counter c2{genie_counter};
+    spdlog::info("Histo-generating {}", i);
+    timed_busy(10ms);
+    spdlog::info("Done histo-generating {}", i);
+    return i;
+  };
 
-  serial_node generator{
-    g, std::tie(genie_limiter), [&genie_counter](unsigned int const i) -> unsigned int {
-      thread_counter c{genie_counter};
-      spdlog::info("Generating {}", i);
-      timed_busy(10ms);
-      return i;
-    }};
+  auto generate = [&genie_counter](unsigned int const i) -> unsigned int {
+    thread_counter c{genie_counter};
+    spdlog::info("Generating {}", i);
+    timed_busy(10ms);
+    return i;
+  };
 
-  serial_node propagator{g, tbb::flow::unlimited, [](unsigned int const i) -> unsigned int {
-                           spdlog::info("Propagating {}", i);
-                           timed_busy(150ms);
-                           spdlog::info("Done propagating {}", i);
-                           return i;
-                         }};
+  auto propagate = [](unsigned int const i) -> unsigned int {
+    spdlog::info("Propagating {}", i);
+    timed_busy(150ms);
+    spdlog::info("Done propagating {}", i);
+    return i;
+  };
+
+  serial_node histogrammer{g, std::tie(root_limiter), fill_histo};
+  serial_node histo_generator{g, std::tie(root_limiter, genie_limiter), gen_fill_histo};
+  serial_node generator{g, std::tie(genie_limiter), generate};
+  serial_node propagator{g, tbb::flow::unlimited, propagate};
 
   // Nodes that use the DB resource limited to 2 tokens
   // TODO: figure out how we pass the token into the user's function, which need to be

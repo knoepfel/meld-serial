@@ -7,6 +7,8 @@
 
 #include "oneapi/tbb/flow_graph.h"
 
+#include <tuple>
+
 namespace meld {
 
   //--------------------------------------------------------------------------
@@ -78,9 +80,18 @@ namespace meld {
         [serialized_resources = std::move(serializers), function = std::move(f), iseq, this](
           join_tuple const& tup) mutable {
           auto [input, tokens] = pop_head(tup);
-          auto output = function(input);
-          return_tokens(serialized_resources, tokens, iseq);
-          return output;
+          if constexpr (requires {
+                          { function(input) };
+                        }) {
+            auto output = function(input);
+            return_tokens(serialized_resources, tokens, iseq);
+            return output;
+          }
+          else {
+            auto output = std::apply(function, tup);
+            return_tokens(serialized_resources, tokens, iseq);
+            return output;
+          }
         }}
     {
       // Need way to route null messages around the join.

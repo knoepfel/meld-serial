@@ -38,17 +38,17 @@ void stop(std::string_view algorithm, unsigned int spill, unsigned int data = 0u
 
 void serialize_functions_based_on_resource()
 {
-  std::cout << "Serialize functions based on resource\n" << std::endl;
+  std::cout << "time\tthread\tevent\tnode\tmessage\tdata\n";
   spdlog::set_pattern("%H:%M:%S.%f\t%t\t%v");
   flow::graph g;
   unsigned int i{};
   flow::input_node src{g, [&i](flow_control& fc) {
-                         if (i < 10) {
+                         if (i < 50) {
+                           start("Source", i + 1); // The message is the spill id we will emit
                            auto j = ++i;
-                           spdlog::info("-> Emitting {}", j);
+                           stop("Source", i);
                            return j;
                          }
-                         spdlog::info("=> Source all done");
                          fc.stop();
                          return 0u;
                        }};

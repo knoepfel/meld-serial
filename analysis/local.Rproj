@@ -1,0 +1,19 @@
+Version: 1.0
+ProjectId: 6964712c-389a-4db1-b9dd-e1add3db247d
+
+RestoreWorkspace: No
+SaveWorkspace: No
+AlwaysSaveHistory: No
+
+EnableCodeIndexing: Yes
+UseSpacesForTab: Yes
+NumSpacesForTab: 2
+Encoding: UTF-8
+
+RnwWeave: knitr
+LaTeX: xeLatex 
+
+AutoAppendNewline: Yes
+StripTrailingWhitespace: Yes
+
+BuildType: Website

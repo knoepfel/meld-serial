@@ -1,0 +1,290 @@
+---
+title: "Analysis of Serial Node Timing"
+format:
+  html:
+    theme: [serif, custom.scss]
+    toc: true
+    code-overflow: wrap
+    grid:
+      body-width: 1200px
+    fig-align: center
+    fig-cap-location: margin
+    fig-width: 12
+    reference-location: margin
+    citation-location: margin
+    tbl-cap-location: margin
+  pdf:
+    documentclass: scrarticle
+    pdfengine: xelatex
+    papersize: letter
+    geometry:
+      - top=1.5in
+      - left=1.0in
+      - heightrounded
+    fig-align: center
+    fig-width: 12
+    toc: true
+    toc-depth: 2
+    number-sections: true
+execute:
+  echo: false
+  eval: true
+  error: true
+  warning: false
+  message: true
+  output: true
+---
+```{r}
+#| include = FALSE
+library(tidyverse)
+library(RColorBrewer)
+source("functions.R")
+```
+
+## Introduction
+
+This document provides some analysis of the timing performance of the `serial_node` node type.
+It analysis a simple data flow with 7 nodes.
+
+* One *Source* (input node) that generates a series of messages.
+  Each message is represented by a single integer.
+  As an input node, it is inherently serialized.
+* One *Propagating* node.
+  This node has unlimited parallelism.
+* One *Histogramming* node.
+  This node requires sole access to the *ROOT* token, of which there is only one.
+* One *Generating* node.
+  This node require sole access to the *GENIE* token, of which there is only one.
+* One *Histo-Generating* node.
+  This node requires simultaneous access to both the *ROOT* and *GENIE* tokens.
+* Three *Calibration* nodes.
+  These nodes are labeled *Calibration[A]*, *Calibration[B]*, and *Calibration[C]*.
+  Each of these nodes requires sole access to a *DB* token.
+  There are two *DB* tokens available.
+  *DB* tokens have an associated integer ID; the values are 1 and 13.
+
+The *Source* node is directly connected to each of the other nodes.
+There are no other connections between nodes.
+The tasks performed by the system is the generation of the messages and the processing of each message by all the other nodes in the system.
+
+Each time a node is fired, we record two events.
+The *Start* event is recorded as the first thing done within the body of the node.
+The node then performs whatever work it is to do (for all but the *Source*, this is a busy loop for some fixed time).
+The *Stop* event is recorded as the last thing done within the body of the node.
+For each event, we record the *thread* on which the event occurred, the *node* that was executing, the *message* number, and the extra *data* associated with the event.
+The extra data is meaningful only for the *Calibration* nodes; this data is the *DB* token ID.
+
+The event records are used to form the `events` data frame.
+Each task is associated with both a *Start* and a *Stop* event.
+These times are measured in milliseconds since the start of the first task.
+The `tasks` data frame is formed by pivoting the `events` data frame to have a single row for each task.
+The *duration* of each task is the difference between the *Stop* and *Start* times, and is also recorded in milliseconds.
+
+The first few rows of the `tasks` data frame are shown in @tbl-read-events below.
+```{r}
+#| label: tbl-read-events
+#| tbl-cap: "First few rows of the `tasks` data frame."
+#| 
+events <- read_times("serial_fanout.tsv")
+tasks <- events |>
+  pivot_wider(id_cols=c(thread, node, message, data),
+              names_from=event,
+              values_from=time) |>
+  
+  mutate(duration = Stop-Start)
+tasks |>
+  arrange(Start) |>
+  head(12) |>
+  kableExtra::kable()
+```
+
+The graph was executed with 50 messages, on a 12-core Mac laptop.
+
+## Analysis of thread occupancy
+
+Our main concern is to understand what the threads are doing, and to see if the hardware is being used efficiently.
+By "efficiently", we mean that the threads are busy doing useful work --- i.e., running our tasks.
+[Fig. @fig-thread-busy] shows the timeline of task execution for each thread.
+
+```{r}
+#| label: fig-thread-busy
+#| fig-cap: "Task execution timeline, showing when each thread is busy and what it is doing.
+#|           This workflow was run on a 12-core Mac laptop."
+tasks |>
+  ggplot(aes(y=thread)) +
+  geom_rect(aes(xmin=Start,
+                xmax=Stop,
+                ymin=as.numeric(thread)-0.3,
+                ymax=as.numeric(thread)+0.3,
+                fill= node),
+            color = "white",
+            linewidth = 0.2) +
+  labs(x = "Time (milliseconds)", y = "Thread") +
+  scale_fill_brewer(palette = "Accent") +  
+  theme_minimal()
+```
+
+The cores are all busy until about 750 milliseconds, at which time we start getting some idle time.
+This is when there are no more *Propagating* tasks to be started; this is the only node that has unlimited parallelism.
+In this view, the *Source* tasks are completed so quickly that we cannot see them.
+
+[Fig. @fig-program-start] zooms in on the first 1.5 milliseconds of the program.
+
+```{r}
+#| label: fig-program-start
+#| fig-cap: "Task execution timeline, showing the startup of the program."
+tasks |>
+  ggplot(aes(y=thread)) +
+  geom_rect(aes(xmin=Start,
+                xmax=Stop,
+                ymin=as.numeric(thread)-0.3,
+                ymax=as.numeric(thread)+0.3,
+                fill= node),
+            color = "white",
+            linewidth = 0.2) +
+  labs(x = "Time (milliseconds)", y = "Thread") +
+  coord_cartesian(xlim = c(0, 1.5)) +  # zoom in but do not drop data
+  scale_fill_brewer(palette = "Accent") +  
+  theme_minimal()
+```
+
+We can see that the *Source* is firing many times, and with a wide spread of durations.
+We also see that the *Source* is serialized, as expected for an input node.
+There appears to be some idle time after the first firing of the *Source*.
+After the first firing, all the activity for the *Source* moves to a different thread.
+There are some idle times between source firings that we do not understand.
+
+In @fig-program-start-after-first, we can zoom in further to see what is happening after the first firing of the *Source*.
+There are delays between the creation of a message by the *Source* and the start of the processing of that message by one of the other nodes, and that delay is variable.
+
+```{r}
+#| label: fig-program-start-after-first
+#| fig-cap: "Task execution timeline, showing the time after the first source firing.
+#|           The numeric label in each rectangle shows the message number being processed by the task."
+
+tasks <- tasks |>
+  mutate(tcenter = (Start + Stop) / 2,
+        # Assign fill colors based on node using the Accent palette
+        fill_color = brewer.pal(n = length(unique(node)), name = "Accent")[as.factor(node)],
+        # Calculate contrasting text color for each fill color
+        text_color = sapply(fill_color, get_contrast_color)
+  )
+
+tasks |>
+  ggplot(aes(y=thread)) +
+  geom_rect(aes(xmin=Start,
+                xmax=Stop,
+                ymin=as.numeric(thread)-0.3,
+                ymax=as.numeric(thread)+0.3,
+                fill= node),
+            color = "white",
+            linewidth = 0.2) +
+  geom_text(aes(x=pmin(tcenter, Start+0.01),
+                y=as.numeric(thread),
+                label=message,
+                color=text_color),
+            show.legend=FALSE) +
+  labs(x = "Time (milliseconds)", y = "Thread") +
+  coord_cartesian(xlim = c(0.6, 1.0)) +  # zoom in but do not drop data
+  scale_color_identity() +  # use text_color as literal colors
+  scale_fill_brewer(palette = "Accent") +  
+  theme_minimal()
+```
+
+We can also zoom in on the program wind-down, as shown in @fig-program-wind-down.
+Here it appears we have some inefficiency.
+On thread 5237312, there are two gaps.
+During the first, it appears there is no work that could be done -- the outstanding tasks could not be run in parallel with the tasks that are running.
+But this does not seem to be the case for the second gap.
+We also see that at the very end of the program, only one thread is running the *Calibration[B]* tasks.
+Since the calibration tasks are independent of each other and we have two *DB* tokens, we should be able to run two tasks.
+This is due to a design flaw in the `serial_node` node type, which are unsure how to fix.
+
+```{r}
+#| label: fig-program-wind-down
+#| fig-cap: "Task execution timeline, showing the time after the first source firing."
+tasks |>
+  ggplot(aes(y=thread)) +
+  geom_rect(aes(xmin=Start,
+                xmax=Stop,
+                ymin=as.numeric(thread)-0.3,
+                ymax=as.numeric(thread)+0.3,
+                fill= node),
+            color = "white",
+            linewidth = 0.2) +
+  labs(x = "Time (seconds)", y = "Thread") +
+  coord_cartesian(xlim = c(700, 1200)) +  # zoom in but do not drop data
+  scale_fill_brewer(palette = "Accent") +  
+  theme_minimal()
+```
+
+
+## Looking on at calibrations
+
+Flowgraph seem to prefer keeping some tasks on a single thread.
+All of the *Histo-generating* tasks were run on a single thread.
+The calibrations are clustered onto a few threads.
+This is shown in @tbl-calibrations.
+
+```{r}
+#| label: tbl-calibrations
+#| tbl-cap: "Number of calibrations of each type done by each thread."
+filter(tasks,
+       str_detect(node, "^Calibration")) |>
+  group_by(thread, node) |>
+  summarize(n=n(), .groups = "drop") |>
+  arrange(thread) |>
+  kableExtra::kable()
+```
+
+## Distribution of *Source* task durations
+
+The body of the *Source* task consists of a single increment of an integer.
+From this, one might assume that the duration of *Source* tasks would be very similar to each other, and quite short.
+The data show otherwise.
+Focusing on the distribution of durations for the *Source* tasks, the variation is quite striking, as shown in @fig-source-durations.
+
+```{r}
+#| label: fig-source-durations
+#| fig-cap: "Distribution of durations for the Source tasks.
+#|           Note the log $x$ axis."
+tasks |>
+  filter(node == "Source") |>
+  mutate(duration = 1e3*duration) |>
+  ggplot(aes(x=duration)) +
+  geom_histogram(bins = 30) +
+  labs(x = "Duration (microseconds)", y = "Count") +
+  scale_x_log10()
+```
+
+With such an extreme variation, we wonder if there may be some interesting time structure.
+The *Source* generates numbers in sequence and serially.
+Thus we can see time structure by plotting different quantities as a function of either the sequential number (`message`) (@fig-source-time-structure-by-message)
+or as the starting time (@fig-source-time-structure-by-start).
+
+```{r}
+#| label: fig-source-time-structure-by-message
+#| fig-cap: "Duration of Source tasks a function of the message number.
+#|           The color of the point indicates the thread on which the task was run."
+tasks |> 
+  filter(node == "Source") |>
+  ggplot(aes(x=message, y=duration, color=thread)) +
+  geom_point() +
+  labs(x = "Message number", y = "Duration (milliseconds)") +
+  scale_y_log10()
+```
+
+```{r}
+#| label: fig-source-time-structure-by-start
+#| fig-cap: "Duration of Source tasks a function of the starting time.
+#|           The color of the point indicates the thread on which the task was run.
+#|           Note the log $x$ axis.
+#|           Also note that the red point starts at time 0, but is plotted at the edge of the graph because the log scale cannot extend to time 0."
+tasks |> 
+  filter(node == "Source") |>
+  ggplot(aes(x=Start, y=duration, color=thread)) +
+  geom_point() +
+  labs(x = "Starting time", y = "Duration (milliseconds)") +
+  scale_x_log10() +
+  scale_y_log10()
+```

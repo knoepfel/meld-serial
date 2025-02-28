@@ -85,7 +85,7 @@ timeline of task execution for each thread.
 
 <div id="fig-thread-busy">
 
-![](serial_node_timinig_files/figure-commonmark/fig-thread-busy-1.png)
+![](serial_node_timing_files/figure-commonmark/fig-thread-busy-1.png)
 
 Figure 1: Task execution timeline, showing when each thread is busy and
 what it is doing. This workflow was run on a 12-core Mac laptop.
@@ -103,7 +103,7 @@ the first 1.5 milliseconds of the program.
 
 <div id="fig-program-start">
 
-![](serial_node_timinig_files/figure-commonmark/fig-program-start-1.png)
+![](serial_node_timing_files/figure-commonmark/fig-program-start-1.png)
 
 Figure 2: Task execution timeline, showing the startup of the program.
 
@@ -125,7 +125,7 @@ variable.
 
 <div id="fig-program-start-after-first">
 
-![](serial_node_timinig_files/figure-commonmark/fig-program-start-after-first-1.png)
+![](serial_node_timing_files/figure-commonmark/fig-program-start-after-first-1.png)
 
 Figure 3: Task execution timeline, showing the time after the first
 source firing. The numeric label in each rectangle shows the message
@@ -147,7 +147,7 @@ type, which are unsure how to fix.
 
 <div id="fig-program-wind-down">
 
-![](serial_node_timinig_files/figure-commonmark/fig-program-wind-down-1.png)
+![](serial_node_timing_files/figure-commonmark/fig-program-wind-down-1.png)
 
 Figure 4: Task execution timeline, showing the time after the first
 source firing.
@@ -201,7 +201,7 @@ tasks, the variation is quite striking, as shown in
 
 <div id="fig-source-durations">
 
-![](serial_node_timinig_files/figure-commonmark/fig-source-durations-1.png)
+![](serial_node_timing_files/figure-commonmark/fig-source-durations-1.png)
 
 Figure 5: Distribution of durations for the Source tasks. Note the log
 $x$ axis.
@@ -219,7 +219,7 @@ class="quarto-xref">Figure 7</a>).
 
 <div id="fig-source-time-structure-by-message">
 
-![](serial_node_timinig_files/figure-commonmark/fig-source-time-structure-by-message-1.png)
+![](serial_node_timing_files/figure-commonmark/fig-source-time-structure-by-message-1.png)
 
 Figure 6: Duration of Source tasks a function of the message number. The
 color of the point indicates the thread on which the task was run.
@@ -228,7 +228,7 @@ color of the point indicates the thread on which the task was run.
 
 <div id="fig-source-time-structure-by-start">
 
-![](serial_node_timinig_files/figure-commonmark/fig-source-time-structure-by-start-1.png)
+![](serial_node_timing_files/figure-commonmark/fig-source-time-structure-by-start-1.png)
 
 Figure 7: Duration of Source tasks a function of the starting time. The
 color of the point indicates the thread on which the task was run. Note

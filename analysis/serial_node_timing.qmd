@@ -26,6 +26,13 @@ format:
     toc: true
     toc-depth: 2
     number-sections: true
+  gfm:
+    code-overflow: wrap
+    fig-align: center
+    fig-width: 12
+    toc: true
+    toc-depth: 2
+    number-sections: true
 execute:
   echo: false
   eval: true
@@ -135,11 +142,11 @@ tasks |>
   theme_minimal()
 ```
 
-The cores are all busy until about 750 milliseconds, at which time we start getting some idle time.
+The cores are all busy until about 700 milliseconds, at which time we start getting some idle time.
 This is when there are no more *Propagating* tasks to be started; this is the only node that has unlimited parallelism.
 In this view, the *Source* tasks are completed so quickly that we cannot see them.
 
-[Fig. @fig-program-start] zooms in on the first 1.5 milliseconds of the program.
+[Fig. @fig-program-start] zooms in on the first 5.0 milliseconds of the program.
 
 ```{r}
 #| label: fig-program-start
@@ -154,14 +161,14 @@ tasks |>
             color = "white",
             linewidth = 0.2) +
   labs(x = "Time (milliseconds)", y = "Thread") +
-  coord_cartesian(xlim = c(0, 1.5)) +  # zoom in but do not drop data
+  coord_cartesian(xlim = c(0, 5.0)) +  # zoom in but do not drop data
   scale_fill_brewer(palette = "Accent") +  
   theme_minimal()
 ```
 
 We can see that the *Source* is firing many times, and with a wide spread of durations.
 We also see that the *Source* is serialized, as expected for an input node.
-There appears to be some idle time after the first firing of the *Source*.
+There is some small idle time after the first firing of the *Source*, and a considerable delay after the second firing.
 After the first firing, all the activity for the *Source* moves to a different thread.
 There are some idle times between source firings that we do not understand.
 
@@ -190,26 +197,21 @@ tasks |>
                 fill= node),
             color = "white",
             linewidth = 0.2) +
-  geom_text(aes(x=pmin(tcenter, Start+0.01),
+  geom_text(aes(x=pmin(tcenter, Start+0.2),
                 y=as.numeric(thread),
                 label=message,
                 color=text_color),
             show.legend=FALSE) +
   labs(x = "Time (milliseconds)", y = "Thread") +
-  coord_cartesian(xlim = c(0.6, 1.0)) +  # zoom in but do not drop data
+  coord_cartesian(xlim = c(1.0, 4.0)) +  # zoom in but do not drop data
   scale_color_identity() +  # use text_color as literal colors
   scale_fill_brewer(palette = "Accent") +  
   theme_minimal()
 ```
 
 We can also zoom in on the program wind-down, as shown in @fig-program-wind-down.
-Here it appears we have some inefficiency.
-On thread 5237312, there are two gaps.
-During the first, it appears there is no work that could be done -- the outstanding tasks could not be run in parallel with the tasks that are running.
-But this does not seem to be the case for the second gap.
-We also see that at the very end of the program, only one thread is running the *Calibration[B]* tasks.
-Since the calibration tasks are independent of each other and we have two *DB* tokens, we should be able to run two tasks.
-This is due to a design flaw in the `serial_node` node type, which are unsure how to fix.
+Here it appears we have some idle threads because there is insufficient work to be done.
+We do not see any sign of unexploited parallelism.
 
 ```{r}
 #| label: fig-program-wind-down
@@ -224,7 +226,7 @@ tasks |>
             color = "white",
             linewidth = 0.2) +
   labs(x = "Time (seconds)", y = "Thread") +
-  coord_cartesian(xlim = c(700, 1200)) +  # zoom in but do not drop data
+  coord_cartesian(xlim = c(700, 1100)) +  # zoom in but do not drop data
   scale_fill_brewer(palette = "Accent") +  
   theme_minimal()
 ```
@@ -234,7 +236,7 @@ tasks |>
 
 Flowgraph seem to prefer keeping some tasks on a single thread.
 All of the *Histo-generating* tasks were run on a single thread.
-The calibrations are clustered onto a few threads.
+The calibrations are clustered onto a subset of threads, and are not distributed evenly across those threads.
 This is shown in @tbl-calibrations.
 
 ```{r}

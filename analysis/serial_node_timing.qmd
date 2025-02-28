@@ -86,12 +86,23 @@ The first few rows of the `tasks` data frame are shown in @tbl-read-events below
 #| tbl-cap: "First few rows of the `tasks` data frame."
 #| 
 events <- read_times("serial_fanout.tsv")
+
 tasks <- events |>
   pivot_wider(id_cols=c(thread, node, message, data),
               names_from=event,
               values_from=time) |>
   
   mutate(duration = Stop-Start)
+
+delays <- tasks |>
+  group_by(thread) |>
+  arrange(Start, .by_group = TRUE) |>
+  mutate(delay = Start-lag(Stop),
+         before = lag(node)) |>
+  # remove first row, which has no delay observation
+  filter(!is.na(delay)) |>
+  ungroup()
+
 tasks |>
   arrange(Start) |>
   head(12) |>

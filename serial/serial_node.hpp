@@ -145,7 +145,7 @@ namespace meld {
                          std::tuple<ResourceLimiters&...> const& serializers,
                          FT f) :
       serial_node{g,
-                  (sizeof...(ResourceLimiters) > 0 ? tbb::flow::serial : tbb::flow::unlimited),
+                  tbb::flow::unlimited,
                   std::move(f),
                   serializers,
                   std::make_index_sequence<sizeof...(ResourceLimiters)>{}}

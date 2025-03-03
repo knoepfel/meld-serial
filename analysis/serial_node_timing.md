@@ -9,6 +9,8 @@
   calibrations](#looking-on-at-calibrations)
 - [<span class="toc-section-number">4</span> Distribution of *Source*
   task durations](#distribution-of-source-task-durations)
+- [<span class="toc-section-number">5</span> Idle time between
+  tasks](#idle-time-between-tasks)
 
 ## Introduction
 
@@ -237,5 +239,54 @@ color of the point indicates the thread on which the task was run. Note
 the log $x$ axis. Also note that the red point starts at time 0, but is
 plotted at the edge of the graph because the log scale cannot extend to
 time 0.
+
+</div>
+
+## Idle time between tasks
+
+One of the concerns that some have with a system, like flowgraph, that
+automates the scheduling of tasks is the amount of time that the
+scheduling system takes (as opposed to the time spend doing the user’s
+defined work). We can estimate this by looking at the time between the
+end of one task and the start of the next task scheduled on the same
+thread. We call this time the *delay* and associate it with the second
+task. We also record, for each delay, whether the previous task on the
+thread was run by the same node. We find this is true for the large
+majority of tasks.
+
+There are a few delays that are much longer than others, as shown in
+<a href="#tbl-long-delays" class="quarto-xref">Table 3</a>.
+
+<div id="tbl-long-delays">
+
+Table 3: Details of the delays longer than 1 millisecond.
+
+<div class="cell-output-display">
+
+| thread | node | message | data | Start | Stop | duration | delay | before | same |
+|:---|:---|---:|---:|---:|---:|---:|---:|:---|:---|
+| 10505296 | Source | 3 | 0 | 3.117 | 3.139 | 0.022 | 1.560 | Source | TRUE |
+| 10505299 | Calibration\[B\] | 49 | 13 | 629.275 | 639.281 | 10.006 | 2.468 | Calibration\[B\] | TRUE |
+| 10505301 | Histo-generating | 13 | 0 | 626.827 | 636.832 | 10.005 | 1.000 | Histo-generating | TRUE |
+
+</div>
+
+</div>
+
+<a href="#fig-delay-distribution" class="quarto-xref">Fig. 8</a> shows
+the distribution of the lengths of the delays. They are typically tens
+of microseconds. We observe no significant difference between the
+distributions for delays for cases when the task in question was run by
+the same node or by a different node.
+
+<div id="fig-delay-distribution">
+
+![](serial_node_timing_files/figure-commonmark/fig-delay-distribution-1.png)
+
+Figure 8: Distribution of delays for all delays shorter than 1
+millisecond. Note the log $x$ axis. The bottom panel shows the delays
+for tasks for which the previous task on the same thread was run by the
+same node. The top panel shows the delays for tasks for which the
+previous task on the same thread was run by a different node.
 
 </div>

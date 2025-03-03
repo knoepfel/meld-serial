@@ -108,7 +108,8 @@ delays <- tasks |>
          before = lag(node)) |>
   # remove first row, which has no delay observation
   filter(!is.na(delay)) |>
-  ungroup()
+  ungroup() |>
+  mutate(same = (node==before))
 
 tasks |>
   arrange(Start) |>
@@ -225,7 +226,7 @@ tasks |>
                 fill= node),
             color = "white",
             linewidth = 0.2) +
-  labs(x = "Time (seconds)", y = "Thread") +
+  labs(x = "Time (milliseconds)", y = "Thread") +
   coord_cartesian(xlim = c(700, 1100)) +  # zoom in but do not drop data
   scale_fill_brewer(palette = "Accent") +  
   theme_minimal()
@@ -300,4 +301,42 @@ tasks |>
   labs(x = "Starting time", y = "Duration (milliseconds)") +
   scale_x_log10() +
   scale_y_log10()
+```
+
+## Idle time between tasks
+
+One of the concerns that some have with a system, like flowgraph, that automates the scheduling of tasks is the amount of time that the scheduling system takes (as opposed to the time spend doing the user's defined work).
+We can estimate this by looking at the time between the end of one task and the start of the next task scheduled on the same thread.
+We call this time the *delay* and associate it with the second task.
+We also record, for each delay, whether the previous task on the thread was run by the same node.
+We find this is true for the large majority of tasks.
+
+There are a few delays that are much longer than others, as shown in @tbl-long-delays.
+
+```{r}
+#| label: tbl-long-delays
+#| tbl-cap: "Details of the delays longer than 1 millisecond."
+delays |>
+  filter(delay > 1.0) |>
+  kableExtra::kable() 
+```
+
+[Fig. @fig-delay-distribution] shows the distribution of the lengths of the delays.
+They are typically tens of microseconds.
+We observe no significant difference between the distributions for delays for cases when the task in question was run by the same node or by a different node.
+
+
+```{r}
+#| label: fig-delay-distribution
+#| fig-cap: "Distribution of delays for all delays shorter than 1 millisecond.
+#|           Note the log $x$ axis.
+#|           The bottom panel shows the delays for tasks for which the previous task on the same thread was run by the same node.
+#|           The top panel shows the delays for tasks for which the previous task on the same thread was run by a different node."
+delays |>
+  filter(delay < 1.0) |>
+  ggplot(aes(delay*1000)) +  # convert to microseconds
+  geom_histogram(bins=30) +
+  labs(x="Delay (microseconds)") +
+  scale_x_log10() +
+  facet_wrap(vars(same), ncol = 1, scales="free_y")
 ```

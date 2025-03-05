@@ -1,6 +1,6 @@
 #include "catch2/catch_template_test_macros.hpp"
 #include "catch2/catch_test_macros.hpp"
-#include "serial/timed_busy.hpp"
+#include "resource_limiting/timed_busy.hpp"
 
 #include <chrono>
 

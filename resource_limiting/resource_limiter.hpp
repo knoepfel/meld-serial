@@ -1,7 +1,7 @@
 #ifndef meld_serial_resource_limiter_hpp
 #define meld_serial_resource_limiter_hpp
 
-#include "serial/sized_tuple.hpp"
+#include "resource_limiting/sized_tuple.hpp"
 
 #include "oneapi/tbb/flow_graph.h"
 

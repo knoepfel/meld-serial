@@ -1,9 +1,9 @@
-#ifndef meld_serial_serial_node_hpp
-#define meld_serial_serial_node_hpp
+#ifndef meld_serial_rl_function_node_hpp
+#define meld_serial_rl_function_node_hpp
 
 #include "metaprogramming/type_deduction.hpp"
-#include "serial/resource_limiter.hpp"
-#include "serial/sized_tuple.hpp"
+#include "resource_limiting/resource_limiter.hpp"
+#include "resource_limiting/sized_tuple.hpp"
 
 #include "oneapi/tbb/flow_graph.h"
 
@@ -35,7 +35,7 @@ namespace meld {
   using maybe_wrap_as_tuple_t = typename maybe_wrap_as_tuple<T>::type;
 
   //--------------------------------------------------------------------------
-  // class serial_node<Input, N, Output> is a composite_node<Input, Output>
+  // class rl_function_node<Input, N, Output> is a composite_node<Input, Output>
   // that also waits to obtain a collection of N tokens of type token_t
   // from several serializers.
   // base<InputTuple, OutputTuple> is a an alias for a composite_node
@@ -44,7 +44,8 @@ namespace meld {
   using base = tbb::flow::composite_node<InputTuple, OutputTuple>;
 
   template <typename Input, typename Output, typename Resources = std::tuple<>>
-  class serial_node : public base<maybe_wrap_as_tuple_t<Input>, maybe_wrap_as_tuple_t<Output>> {
+  class rl_function_node :
+    public base<maybe_wrap_as_tuple_t<Input>, maybe_wrap_as_tuple_t<Output>> {
     using input_tuple = maybe_wrap_as_tuple_t<Input>;
     using output_tuple = maybe_wrap_as_tuple_t<Output>;
     using base_t = base<input_tuple, output_tuple>;
@@ -81,15 +82,15 @@ namespace meld {
 
     // Private constructor, used in the impelementation of the public constructor.
     template <typename FT, typename Serializers, std::size_t... I>
-    explicit serial_node(tbb::flow::graph& g,
-                         std::size_t concurrency,
-                         FT f,
-                         Serializers serializers,
-                         std::index_sequence<I...> iseq) :
+    explicit rl_function_node(tbb::flow::graph& g,
+                              std::size_t concurrency,
+                              FT f,
+                              Serializers serializers,
+                              std::index_sequence<I...> iseq) :
       base_t{g},
       buffered_msgs_{g},
       join_{g},
-      serialized_function_{
+      function_{
         g,
         concurrency,
         [serialized_resources = std::move(serializers), function = std::move(f), iseq, this](
@@ -103,16 +104,16 @@ namespace meld {
       // Need way to route null messages around the join.
       make_edge(buffered_msgs_, input_port<0>(join_));
       make_serializer_edges(iseq, serializers);
-      make_edge(join_, serialized_function_);
+      make_edge(join_, function_);
       base_t::set_external_ports(typename base_t::input_ports_type{buffered_msgs_},
-                                 typename base_t::output_ports_type{serialized_function_});
+                                 typename base_t::output_ports_type{function_});
     }
 
   public:
     /**
-    * @brief Constructs a serial_node with a specified flow graph, concurrency and function.
+    * @brief Constructs a rl_function_node with a specified flow graph, concurrency and function.
     *
-    * This constructor initializes a serial_node that will be added to the given flow graph
+    * This constructor initializes a rl_function_node that will be added to the given flow graph
     * and execute the specified function. The number of serializers is 0. The node will have
     * the specified concurrency.
     *
@@ -122,15 +123,15 @@ namespace meld {
     * @param f The function to be executed by the serialized function.
     */
     template <typename FT>
-    explicit serial_node(tbb::flow::graph& g, std::size_t concurrency, FT f) :
-      serial_node{g, concurrency, std::move(f), std::tuple{}, std::make_index_sequence<0>{}}
+    explicit rl_function_node(tbb::flow::graph& g, std::size_t concurrency, FT f) :
+      rl_function_node{g, concurrency, std::move(f), std::tuple{}, std::make_index_sequence<0>{}}
     {
     }
 
     /**
-    * @brief Constructs a serial_node with a specified flow graph, serializers, and function.
+    * @brief Constructs a rl_function_node with a specified flow graph, serializers, and function.
     *
-    * This constructor initializes a serial_node that will operate on the given flow graph,
+    * This constructor initializes a rl_function_node that will operate on the given flow graph,
     * use the provided serializers, and execute the specified function. The execution
     * policy is determined based on the number of serializers.
     *
@@ -141,39 +142,39 @@ namespace meld {
     * @param f The function to be executed by the node.
     */
     template <typename FT, typename... ResourceLimiters>
-    explicit serial_node(tbb::flow::graph& g,
-                         std::tuple<ResourceLimiters&...> const& serializers,
-                         FT f) :
-      serial_node{g,
-                  tbb::flow::unlimited,
-                  std::move(f),
-                  serializers,
-                  std::make_index_sequence<sizeof...(ResourceLimiters)>{}}
+    explicit rl_function_node(tbb::flow::graph& g,
+                              std::tuple<ResourceLimiters&...> const& serializers,
+                              FT f) :
+      rl_function_node{g,
+                       tbb::flow::unlimited,
+                       std::move(f),
+                       serializers,
+                       std::make_index_sequence<sizeof...(ResourceLimiters)>{}}
     {
     }
 
   private:
     tbb::flow::buffer_node<Input> buffered_msgs_;
     tbb::flow::join_node<join_tuple, tbb::flow::reserving> join_;
-    tbb::flow::function_node<join_tuple, Output> serialized_function_;
+    tbb::flow::function_node<join_tuple, Output> function_;
   };
 
   // Deduction guide.
   // If the user provides a callable type and a tuple of token types, we can deduce
   // the input and output types (and the tuple of resources).
   template <typename FT, typename... Ts>
-  serial_node(tbb::flow::graph&, std::tuple<Ts&...>, FT)
-    -> serial_node<function_parameter_type<0, FT>,          // Input
-                   return_type<FT>,                         // Output
-                   std::tuple<typename Ts::token_type...>>; // Resources
+  rl_function_node(tbb::flow::graph&, std::tuple<Ts&...>, FT)
+    -> rl_function_node<function_parameter_type<0, FT>,          // Input
+                        return_type<FT>,                         // Output
+                        std::tuple<typename Ts::token_type...>>; // Resources
 
   // Deduction guide.
   // If the user provides a callable type and an integer, we can deduce the input
-  // and output types. The result is a serial_node that does not serialize on
+  // and output types. The result is a rl_function_node that does not serialize on
   // any resources, but has the specified concurrency.
   template <typename FT, std::convertible_to<int> T>
-  serial_node(tbb::flow::graph&, T, FT)
-    -> serial_node<function_parameter_type<0, FT>, return_type<FT>, std::tuple<>>;
+  rl_function_node(tbb::flow::graph&, T, FT)
+    -> rl_function_node<function_parameter_type<0, FT>, return_type<FT>, std::tuple<>>;
 }
 
-#endif /* meld_serial_serial_node_hpp */
+#endif /* meld_serial_rl_function_node_hpp */

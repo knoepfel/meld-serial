@@ -1,6 +1,6 @@
 #include "catch2/catch_test_macros.hpp"
 #include "oneapi/tbb/flow_graph.h"
-#include "serial/timed_busy.hpp"
+#include "resource_limiting/timed_busy.hpp"
 #include "short_circuiter/short_circuiter_node.hpp"
 #include "short_circuiter/simple_short_circuiter_node.hpp"
 #include "short_circuiter/timer.hpp"

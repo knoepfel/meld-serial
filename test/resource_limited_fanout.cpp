@@ -1,6 +1,6 @@
-#include "serial/serial_node.hpp"
-#include "serial/thread_counter.hpp"
-#include "serial/timed_busy.hpp"
+#include "resource_limiting/rl_function_node.hpp"
+#include "resource_limiting/thread_counter.hpp"
+#include "resource_limiting/timed_busy.hpp"
 
 #include "oneapi/tbb/flow_graph.h"
 #include "spdlog/spdlog.h"
@@ -97,10 +97,10 @@ void serialize_functions_based_on_resource()
     return i;
   };
 
-  serial_node histogrammer{g, std::tie(root_limiter), fill_histo};
-  serial_node histo_generator{g, std::tie(root_limiter, genie_limiter), gen_fill_histo};
-  serial_node generator{g, std::tie(genie_limiter), generate};
-  serial_node propagator{g, tbb::flow::unlimited, propagate};
+  rl_function_node histogrammer{g, std::tie(root_limiter), fill_histo};
+  rl_function_node histo_generator{g, std::tie(root_limiter, genie_limiter), gen_fill_histo};
+  rl_function_node generator{g, std::tie(genie_limiter), generate};
+  rl_function_node propagator{g, tbb::flow::unlimited, propagate};
 
   // Nodes that use the DB resource limited to 2 tokens
   auto make_calibrator = [&db_counter](std::string_view algorithm) {
@@ -113,9 +113,9 @@ void serialize_functions_based_on_resource()
     };
   };
 
-  serial_node calibratorA{g, std::tie(db_limiter), make_calibrator("Calibration[A]")};
-  serial_node calibratorB{g, std::tie(db_limiter), make_calibrator("Calibration[B]")};
-  serial_node calibratorC{g, std::tie(db_limiter), make_calibrator("Calibration[C]")};
+  rl_function_node calibratorA{g, std::tie(db_limiter), make_calibrator("Calibration[A]")};
+  rl_function_node calibratorB{g, std::tie(db_limiter), make_calibrator("Calibration[B]")};
+  rl_function_node calibratorC{g, std::tie(db_limiter), make_calibrator("Calibration[C]")};
 
   make_edge(src, histogrammer);
   make_edge(src, histo_generator);

@@ -153,6 +153,33 @@ namespace meld {
     {
     }
 
+    /**
+    * @brief Constructs a rl_function_node with a specified flow graph, concurrency, serializers, and function.
+    *
+    * This constructor initializes a rl_function_node that will operate on the given flow
+    * graph, honor the maximum allowed concurrency, use the provided serializers, and
+    * execute the specified function. The execution policy is determined based on the
+    * number of serializers.
+    *
+    * @tparam FT The type of the function to be executed.
+    * @tparam T The type of the specified concurrency.
+    * @tparam ResourceLimiters The types of the serializers to be used.
+    * @param g The TBB flow graph to which this node will be added.
+    * @param serializers A tuple containing the allowed concurrency and references to the serializers.
+    * @param f The function to be executed by the node.
+    */
+    template <typename FT, std::convertible_to<int> Int, typename... ResourceLimiters>
+    explicit rl_function_node(tbb::flow::graph& g,
+                              std::tuple<Int, ResourceLimiters&...> const& serializers,
+                              FT f) :
+      rl_function_node{g,
+                       std::get<0>(serializers), // concurrency
+                       std::move(f),
+                       pop_head(serializers).second, // remainder of
+                       std::make_index_sequence<sizeof...(ResourceLimiters)>{}}
+    {
+    }
+
   private:
     tbb::flow::buffer_node<Input> buffered_msgs_;
     tbb::flow::join_node<join_tuple, tbb::flow::reserving> join_;
@@ -175,6 +202,16 @@ namespace meld {
   template <typename FT, std::convertible_to<int> T>
   rl_function_node(tbb::flow::graph&, T, FT)
     -> rl_function_node<function_parameter_type<0, FT>, return_type<FT>, std::tuple<>>;
+
+  // Deduction guide.
+  // If the user provides a callable type and a tuple of an integer and token types, we
+  // can deduce the input and output types, the specified concurrency, and the tuple of
+  // resources.
+  template <typename FT, std::convertible_to<int> T, typename... Ts>
+  rl_function_node(tbb::flow::graph&, std::tuple<T, Ts&...>, FT)
+    -> rl_function_node<function_parameter_type<0, FT>,
+                        return_type<FT>,
+                        std::tuple<typename Ts::token_type...>>;
 }
 
 #endif /* meld_serial_rl_function_node_hpp */

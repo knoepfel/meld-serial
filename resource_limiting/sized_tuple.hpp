@@ -36,7 +36,7 @@ namespace meld {
   std::pair<Head, std::tuple<Tail...>> pop_head(std::tuple<Head, Tail...> const& tup)
   {
     auto tuple_from_tail = []<std::size_t... Is>(auto const& t, std::index_sequence<Is...>) {
-      return std::make_tuple(std::get<Is + 1>(t)...);
+      return std::tie(std::get<Is + 1>(t)...);
     };
     return {std::get<0>(tup), tuple_from_tail(tup, std::make_index_sequence<sizeof...(Tail)>{})};
   }

@@ -6,6 +6,7 @@
 #include "spdlog/spdlog.h"
 
 #include <atomic>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -115,7 +116,8 @@ void serialize_functions_based_on_resource()
 
   rl_function_node calibratorA{g, std::tie(db_limiter), make_calibrator("Calibration[A]")};
   rl_function_node calibratorB{g, std::tie(db_limiter), make_calibrator("Calibration[B]")};
-  rl_function_node calibratorC{g, std::tie(db_limiter), make_calibrator("Calibration[C]")};
+  rl_function_node calibratorC{
+    g, std::make_tuple(tbb::flow::serial, std::ref(db_limiter)), make_calibrator("Calibration[C]")};
 
   make_edge(src, histogrammer);
   make_edge(src, histo_generator);

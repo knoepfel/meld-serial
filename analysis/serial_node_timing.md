@@ -31,17 +31,30 @@ This document provides some analysis of the timing performance of the
   *Calibration\[B\]*, and *Calibration\[C\]*. Each of these nodes
   requires sole access to a *DB* token. There are two *DB* tokens
   available. *DB* tokens have an associated integer ID; the values are 1
-  and 13.
+  and 13. *Calibration\[A\]* and *Calibration\[B\]* have unlimited
+  concurrency but *Calibration\[C\]* is serial. This means that, at the
+  same time, we can have:
+  - two *Calibration\[A\]* tasks running, or
+  - two *Calibration\[B\]* tasks running, or
+  - one *Calibration\[A\]* task running and one *Calibration\[B\]* task
+    running, or
+  - one *Calibration\[A\]* task running and one *Calibration\[C\]* task
+    running, or
+  - one *Calibration\[B\]* task running and one *Calibration\[C\]* task
+    running.
+
+  But we can not have two *Calibration\[C\]* tasks running at the same
+  time.
 
 The *Source* node is directly connected to each of the other nodes.
 There are no other connections between nodes. The tasks performed by the
 system is the generation of the messages and the processing of each
 message by all the other nodes in the system.
 
-Each time a node is fired, we record two events. The *Start* event is
+Each time a node is fired, we record two events. A *Start* event is
 recorded as the first thing done within the body of the node. The node
 then performs whatever work it is to do (for all but the *Source*, this
-is a busy loop for some fixed time). The *Stop* event is recorded as the
+is a busy loop for some fixed time). A *Stop* event is recorded as the
 last thing done within the body of the node. For each event, we record
 the *thread* on which the event occurred, the *node* that was executing,
 the *message* number, and the extra *data* associated with the event.
@@ -65,32 +78,33 @@ Table 1: First few rows of the `tasks` data frame.
 
 <div class="cell-output-display">
 
-| thread   | node             | message | data | Start |    Stop | duration |
-|:---------|:-----------------|--------:|-----:|------:|--------:|---------:|
-| 10505306 | Source           |       1 |    0 | 0.000 |   1.353 |    1.353 |
-| 10505306 | Calibration\[C\] |       1 |    1 | 1.424 |  11.454 |   10.030 |
-| 10505304 | Histogramming    |       1 |    0 | 1.442 |  11.463 |   10.021 |
-| 10505305 | Propagating      |       1 |    0 | 1.480 | 151.505 |  150.025 |
-| 10505307 | Calibration\[A\] |       1 |   13 | 1.497 |  11.580 |   10.083 |
-| 10505296 | Source           |       2 |    0 | 1.537 |   1.557 |    0.020 |
-| 10505296 | Source           |       3 |    0 | 3.117 |   3.139 |    0.022 |
-| 10505301 | Generating       |       1 |    0 | 3.121 |  13.167 |   10.046 |
-| 10505296 | Source           |       4 |    0 | 3.204 |   3.213 |    0.009 |
-| 10505296 | Source           |       5 |    0 | 3.225 |   3.232 |    0.007 |
-| 10505298 | Propagating      |       2 |    0 | 3.235 | 153.306 |  150.071 |
-| 10505300 | Propagating      |       3 |    0 | 3.240 | 153.258 |  150.018 |
+| thread  | node             | message | data | Start |    Stop | duration |
+|:--------|:-----------------|--------:|-----:|------:|--------:|---------:|
+| 7578204 | Source           |       1 |    0 | 0.000 |   1.142 |    1.142 |
+| 7578204 | Calibration\[C\] |       1 |    1 | 1.209 |  11.244 |   10.035 |
+| 7578208 | Source           |       2 |    0 | 1.245 |   1.386 |    0.141 |
+| 7578212 | Histogramming    |       1 |    0 | 1.255 |  11.292 |   10.037 |
+| 7578214 | Calibration\[B\] |       1 |   13 | 1.296 |  11.327 |   10.031 |
+| 7578211 | Generating       |       1 |    0 | 1.346 |  11.764 |   10.418 |
+| 7578206 | Propagating      |       1 |    0 | 1.378 | 151.434 |  150.056 |
+| 7578208 | Source           |       3 |    0 | 1.420 |   1.517 |    0.097 |
+| 7578213 | Propagating      |       2 |    0 | 1.438 | 151.463 |  150.025 |
+| 7578208 | Source           |       4 |    0 | 1.570 |   1.601 |    0.031 |
+| 7578207 | Propagating      |       3 |    0 | 1.614 | 151.638 |  150.024 |
+| 7578208 | Source           |       5 |    0 | 1.625 |   1.671 |    0.046 |
 
 </div>
 
 </div>
 
-The graph was executed with 50 messages, on a 12-core Mac laptop.
+The graph was executed with 50 messages, on a 12-core MacBook Pro laptop
+with an Apple M2 Max chip.
 
 ## Analysis of thread occupancy
 
 Our main concern is to understand what the threads are doing, and to see
 if the hardware is being used efficiently. By “efficiently”, we mean
-that the threads are busy doing useful work — i.e., running our tasks.
+that the threads are busy doing useful work—i.e., running our tasks.
 <a href="#fig-thread-busy" class="quarto-xref">Fig. 1</a> shows the
 timeline of task execution for each thread.
 
@@ -99,7 +113,8 @@ timeline of task execution for each thread.
 ![](serial_node_timing_files/figure-commonmark/fig-thread-busy-1.png)
 
 Figure 1: Task execution timeline, showing when each thread is busy and
-what it is doing. This workflow was run on a 12-core Mac laptop.
+what it is doing. This workflow was run on a 12-core laptop, using 12
+threads.
 
 </div>
 
@@ -123,17 +138,18 @@ Figure 2: Task execution timeline, showing the startup of the program.
 We can see that the *Source* is firing many times, and with a wide
 spread of durations. We also see that the *Source* is serialized, as
 expected for an input node. There is some small idle time after the
-first firing of the *Source*, and a considerable delay after the second
-firing. After the first firing, all the activity for the *Source* moves
-to a different thread. There are some idle times between source firings
-that we do not understand.
+first firing of the *Source*, and a addtional delays after the next few
+firings. After the first firing, all the activity for the *Source* moves
+to a different thread. We do not understand the cause of the delays
+between source firings, or the range of durations of the *Source* tasks.
 
 In <a href="#fig-program-start-after-first"
 class="quarto-xref">Figure 3</a>, we can zoom in further to see what is
 happening after the first firing of the *Source*. There are delays
 between the creation of a message by the *Source* and the start of the
 processing of that message by one of the other nodes, and that delay is
-variable.
+variable. In this plot we see that it is message 17 that has an enormous
+duration for the *Source* task: 4.889 ms.
 
 <div id="fig-program-start-after-first">
 
@@ -148,7 +164,11 @@ number being processed by the task.
 We can also zoom in on the program wind-down, as shown in
 <a href="#fig-program-wind-down" class="quarto-xref">Figure 4</a>. Here
 it appears we have some idle threads because there is insufficient work
-to be done. We do not see any sign of unexploited parallelism.
+to be done. We also see the effect of the serial constraint on the
+*Calibration\[C\]* node. While *Calibration\[A\]* and *Calibration\[B\]*
+can run simultaneously on two threads, which we see in the last part of
+the plot, we see that *Calibration\[C\]* is only running on one thread
+at a time. We do not see any sign of unexploited parallelism.
 
 <div id="fig-program-wind-down">
 
@@ -162,9 +182,10 @@ source firing.
 ## Looking on at calibrations
 
 Flowgraph seem to prefer keeping some tasks on a single thread. All of
-the *Histo-generating* tasks were run on a single thread. The
-calibrations are clustered onto a subset of threads, and are not
-distributed evenly across those threads. This is shown in
+the *Histo-generating* tasks were run on the same thread. The same is
+true for *Generating* and *Histogramming* tasks. The calibrations are
+clustered onto a subset of threads, and are not distributed evenly
+across those threads. This is shown in
 <a href="#tbl-calibrations" class="quarto-xref">Table 2</a>.
 
 <div id="tbl-calibrations">
@@ -173,22 +194,24 @@ Table 2: Number of calibrations of each type done by each thread.
 
 <div class="cell-output-display">
 
-| thread   | node             |   n |
-|:---------|:-----------------|----:|
-| 10505296 | Calibration\[B\] |   1 |
-| 10505297 | Calibration\[A\] |  17 |
-| 10505297 | Calibration\[C\] |  14 |
-| 10505299 | Calibration\[A\] |  25 |
-| 10505299 | Calibration\[B\] |   5 |
-| 10505299 | Calibration\[C\] |  30 |
-| 10505302 | Calibration\[B\] |   2 |
-| 10505305 | Calibration\[C\] |   1 |
-| 10505306 | Calibration\[A\] |   5 |
-| 10505306 | Calibration\[B\] |  40 |
-| 10505306 | Calibration\[C\] |   4 |
-| 10505307 | Calibration\[A\] |   3 |
-| 10505307 | Calibration\[B\] |   2 |
-| 10505307 | Calibration\[C\] |   1 |
+| thread  | node             |   n |
+|:--------|:-----------------|----:|
+| 7578204 | Calibration\[A\] |   8 |
+| 7578204 | Calibration\[B\] |  28 |
+| 7578204 | Calibration\[C\] |  27 |
+| 7578205 | Calibration\[A\] |   4 |
+| 7578205 | Calibration\[B\] |  14 |
+| 7578205 | Calibration\[C\] |  17 |
+| 7578206 | Calibration\[B\] |   1 |
+| 7578206 | Calibration\[C\] |   1 |
+| 7578207 | Calibration\[A\] |  10 |
+| 7578207 | Calibration\[B\] |   3 |
+| 7578207 | Calibration\[C\] |   3 |
+| 7578214 | Calibration\[A\] |   1 |
+| 7578214 | Calibration\[B\] |   1 |
+| 7578215 | Calibration\[A\] |  27 |
+| 7578215 | Calibration\[B\] |   3 |
+| 7578215 | Calibration\[C\] |   2 |
 
 </div>
 
@@ -265,9 +288,9 @@ Table 3: Details of the delays longer than 1 millisecond.
 
 | thread | node | message | data | Start | Stop | duration | delay | before | same |
 |:---|:---|---:|---:|---:|---:|---:|---:|:---|:---|
-| 10505296 | Source | 3 | 0 | 3.117 | 3.139 | 0.022 | 1.560 | Source | TRUE |
-| 10505299 | Calibration\[B\] | 49 | 13 | 629.275 | 639.281 | 10.006 | 2.468 | Calibration\[B\] | TRUE |
-| 10505301 | Histo-generating | 13 | 0 | 626.827 | 636.832 | 10.005 | 1.000 | Histo-generating | TRUE |
+| 7578204 | Calibration\[C\] | 43 | 1 | 955.154 | 965.164 | 10.010 | 140.029 | Propagating | FALSE |
+| 7578205 | Propagating | 29 | 0 | 453.642 | 603.658 | 150.016 | 1.544 | Propagating | TRUE |
+| 7578215 | Propagating | 37 | 0 | 603.757 | 753.760 | 150.003 | 1.567 | Propagating | TRUE |
 
 </div>
 

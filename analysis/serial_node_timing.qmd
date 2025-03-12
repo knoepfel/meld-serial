@@ -69,15 +69,24 @@ It analysis a simple data flow with 7 nodes.
   Each of these nodes requires sole access to a *DB* token.
   There are two *DB* tokens available.
   *DB* tokens have an associated integer ID; the values are 1 and 13.
+  *Calibration[A]* and *Calibration[B]* have unlimited concurrency but *Calibration[C]* is serial.
+  This means that, at the same time, we can have:
+  * two *Calibration[A]* tasks running, or
+  * two *Calibration[B]* tasks running, or
+  * one *Calibration[A]* task running and one *Calibration[B]* task running, or
+  * one *Calibration[A]* task running and one *Calibration[C]* task running, or
+  * one *Calibration[B]* task running and one *Calibration[C]* task running.
+  
+  But we can not have two *Calibration[C]* tasks running at the same time.
 
 The *Source* node is directly connected to each of the other nodes.
 There are no other connections between nodes.
 The tasks performed by the system is the generation of the messages and the processing of each message by all the other nodes in the system.
 
 Each time a node is fired, we record two events.
-The *Start* event is recorded as the first thing done within the body of the node.
+A *Start* event is recorded as the first thing done within the body of the node.
 The node then performs whatever work it is to do (for all but the *Source*, this is a busy loop for some fixed time).
-The *Stop* event is recorded as the last thing done within the body of the node.
+A *Stop* event is recorded as the last thing done within the body of the node.
 For each event, we record the *thread* on which the event occurred, the *node* that was executing, the *message* number, and the extra *data* associated with the event.
 The extra data is meaningful only for the *Calibration* nodes; this data is the *DB* token ID.
 
@@ -117,18 +126,18 @@ tasks |>
   kableExtra::kable()
 ```
 
-The graph was executed with 50 messages, on a 12-core Mac laptop.
+The graph was executed with 50 messages, on a 12-core MacBook Pro laptop with an Apple M2 Max chip.
 
 ## Analysis of thread occupancy
 
 Our main concern is to understand what the threads are doing, and to see if the hardware is being used efficiently.
-By "efficiently", we mean that the threads are busy doing useful work --- i.e., running our tasks.
+By "efficiently", we mean that the threads are busy doing useful work---i.e., running our tasks.
 [Fig. @fig-thread-busy] shows the timeline of task execution for each thread.
 
 ```{r}
 #| label: fig-thread-busy
 #| fig-cap: "Task execution timeline, showing when each thread is busy and what it is doing.
-#|           This workflow was run on a 12-core Mac laptop."
+#|           This workflow was run on a 12-core laptop, using 12 threads."
 tasks |>
   ggplot(aes(y=thread)) +
   geom_rect(aes(xmin=Start,
@@ -169,12 +178,17 @@ tasks |>
 
 We can see that the *Source* is firing many times, and with a wide spread of durations.
 We also see that the *Source* is serialized, as expected for an input node.
-There is some small idle time after the first firing of the *Source*, and a considerable delay after the second firing.
+There is some small idle time after the first firing of the *Source*, and a addtional delays after the next few firings.
 After the first firing, all the activity for the *Source* moves to a different thread.
-There are some idle times between source firings that we do not understand.
+We do not understand the cause of the delays between source firings, or the range of durations of the *Source* tasks.
+
+```{r}
+longest_source = max(tasks$duration[tasks$node == "Source"])
+```
 
 In @fig-program-start-after-first, we can zoom in further to see what is happening after the first firing of the *Source*.
 There are delays between the creation of a message by the *Source* and the start of the processing of that message by one of the other nodes, and that delay is variable.
+In this plot we see that it is message 17 that has an enormous duration for the *Source* task: `r longest_source` ms.
 
 ```{r}
 #| label: fig-program-start-after-first
@@ -204,7 +218,7 @@ tasks |>
                 color=text_color),
             show.legend=FALSE) +
   labs(x = "Time (milliseconds)", y = "Thread") +
-  coord_cartesian(xlim = c(1.0, 4.0)) +  # zoom in but do not drop data
+  coord_cartesian(xlim = c(1.0, 2.2)) +  # zoom in but do not drop data
   scale_color_identity() +  # use text_color as literal colors
   scale_fill_brewer(palette = "Accent") +  
   theme_minimal()
@@ -212,7 +226,10 @@ tasks |>
 
 We can also zoom in on the program wind-down, as shown in @fig-program-wind-down.
 Here it appears we have some idle threads because there is insufficient work to be done.
+We also see the effect of the serial constraint on the *Calibration[C]* node.
+While *Calibration[A]* and *Calibration[B]* can run simultaneously on two threads, which we see in the last part of the plot, we see that *Calibration[C]* is only running on one thread at a time.
 We do not see any sign of unexploited parallelism.
+
 
 ```{r}
 #| label: fig-program-wind-down
@@ -236,7 +253,8 @@ tasks |>
 ## Looking on at calibrations
 
 Flowgraph seem to prefer keeping some tasks on a single thread.
-All of the *Histo-generating* tasks were run on a single thread.
+All of the *Histo-generating* tasks were run on the same thread.
+The same is true for *Generating* and *Histogramming* tasks.
 The calibrations are clustered onto a subset of threads, and are not distributed evenly across those threads.
 This is shown in @tbl-calibrations.
 
@@ -298,7 +316,7 @@ tasks |>
   filter(node == "Source") |>
   ggplot(aes(x=Start, y=duration, color=thread)) +
   geom_point() +
-  labs(x = "Starting time", y = "Duration (milliseconds)") +
+  labs(x = "Starting time (milliseconds)", y = "Duration (milliseconds)") +
   scale_x_log10() +
   scale_y_log10()
 ```

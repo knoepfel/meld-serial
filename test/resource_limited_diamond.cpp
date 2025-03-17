@@ -12,6 +12,7 @@
 using namespace std::chrono_literals;
 using namespace meld;
 using namespace oneapi::tbb;
+
 void serialize_functions_when_splitting_then_merging()
 {
   std::cout << "\nSerialize functions when splitting then merging\n" << std::endl;

@@ -105,7 +105,7 @@ void serialize_functions_based_on_resource()
 
   // Nodes that use the DB resource limited to 2 tokens
   auto make_calibrator = [&db_counter](std::string_view algorithm) {
-    return [&db_counter, algorithm](unsigned int const i, DB const* db) -> unsigned int {
+    return [&db_counter, algorithm](unsigned int const i, token<DB> db) -> unsigned int {
       thread_counter c{db_counter, 2};
       start(algorithm, i, db->id);
       timed_busy(10ms);

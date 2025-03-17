@@ -13,6 +13,9 @@
 
 namespace meld {
 
+  template <typename Handle>
+  using token = Handle*;
+
   // ----------------------------------------------------------------------------
   // default_resource_handle is a handle that controls no resource. It is a stateless
   // object. It is intended to be used to limit access to resources or facilities that
@@ -27,7 +30,7 @@ namespace meld {
   // points to the handle. The resource_limiter owns the handles, and thus the
   // resources with which they are associated.
   template <typename Handle = default_resource_handle>
-  class resource_limiter : public tbb::flow::buffer_node<Handle const*> {
+  class resource_limiter : public tbb::flow::buffer_node<token<Handle>> {
   public:
     // Resources limiters are not copyable but are movable.
     resource_limiter(resource_limiter const&) = delete;
@@ -35,7 +38,7 @@ namespace meld {
     resource_limiter(resource_limiter&&) = default;
     resource_limiter& operator=(resource_limiter&&) = default;
 
-    using token_type = Handle const*;
+    using token_type = token<Handle>;
 
     /// \brief Constructs a resource_limiter with \a n_tokens tokens of type \a Handle.
     ///
@@ -66,7 +69,7 @@ namespace meld {
     void activate()
     {
       // Place tokens into the buffer.
-      for (auto const& handle : handles_) {
+      for (auto& handle : handles_) {
         tbb::flow::buffer_node<token_type>::try_put(&handle);
       }
     }
